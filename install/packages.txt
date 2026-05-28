@@ -1,0 +1,40 @@
+# dotfiles-Fedora/install/packages.txt
+# dnf package names for the modern terminal stack. One per line; # comments ok.
+# Tools NOT reliably packaged on Fedora (starship, atuin, yazi) are installed
+# by bootstrap.sh via their upstream installers instead — keep them OUT of here.
+
+# ── shell + multiplexer ───────────────────────────────────────
+zsh
+tmux
+
+# ── modern CLI core (all in Fedora repos as of F40+) ──────────
+eza            # ls
+bat            # cat
+fd-find        # find  (binary: fd on Fedora, not fdfind)
+ripgrep        # grep
+zoxide         # cd
+fzf            # fuzzy finder
+git-delta      # git pager / diffs
+btop           # top/htop
+tealdeer       # tldr (fast Rust client; binary: tldr)
+
+# ── editor + git workflow ─────────────────────────────────────
+neovim
+git
+lazygit
+
+# ── clipboard (Fedora Workstation is Wayland-first) ───────────
+wl-clipboard   # wl-copy / wl-paste
+xclip          # X11 fallback (sessions / SSH X-forward)
+
+# ── build + language toolchain (needed for cargo-installed tools) ─
+gcc
+make
+cargo          # rust toolchain -> cargo install fallback for yazi/dust/procs
+
+# ── misc useful ───────────────────────────────────────────────
+curl
+wget
+jq
+htop
+flatpak

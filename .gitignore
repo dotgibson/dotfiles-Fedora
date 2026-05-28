@@ -1,0 +1,9 @@
+# dotfiles-Fedora/.gitignore
+*.log
+*.bak
+*.pre-dotfiles.*
+.DS_Store
+zsh/local.zsh
+.env
+.env.*
+!.env.example
