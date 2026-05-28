@@ -21,7 +21,7 @@ tealdeer       # tldr (fast Rust client; binary: tldr)
 # ── editor + git workflow ─────────────────────────────────────
 neovim
 git
-lazygit
+# lazygit is NOT in Fedora base repos — bootstrap.sh installs it via COPR (atim/lazygit)
 
 # ── clipboard (Fedora Workstation is Wayland-first) ───────────
 wl-clipboard   # wl-copy / wl-paste

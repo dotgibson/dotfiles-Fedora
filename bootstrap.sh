@@ -77,8 +77,11 @@ provision() {
   say "dnf packages (from install/packages.txt)"
   local -a pkgs=()
   mapfile -t pkgs < <(read_pkgs "$DOTFILES/install/packages.txt")
-  sudo dnf -y install "${pkgs[@]}"
-  ok "dnf packages installed (${#pkgs[@]})"
+  # dnf5 fails the WHOLE transaction if any single requested pkg is unavailable
+  # (and is fussy about already-installed ones) — --skip-unavailable makes the
+  # bulk install resilient: missing names are skipped instead of aborting.
+  sudo dnf -y install --skip-unavailable "${pkgs[@]}"
+  ok "dnf packages installed (${#pkgs[@]} requested)"
 
   # Tools not reliably packaged on Fedora — match the other repos via upstream.
   if ! command -v starship >/dev/null; then
@@ -92,6 +95,14 @@ provision() {
   if ! command -v yazi >/dev/null && command -v cargo >/dev/null; then
     say "yazi (cargo)"
     cargo install --locked yazi-fs yazi-cli >/dev/null 2>&1 || true
+  fi
+  # lazygit isn't in Fedora's base repos — pull it from the well-known COPR.
+  if ! command -v lazygit >/dev/null; then
+    say "lazygit (COPR atim/lazygit)"
+    sudo dnf -y install dnf5-plugins >/dev/null 2>&1 || true
+    sudo dnf -y copr enable atim/lazygit >/dev/null 2>&1 || true
+    sudo dnf -y install lazygit >/dev/null 2>&1 \
+      || echo "   lazygit COPR install failed; do it later: sudo dnf copr enable atim/lazygit && sudo dnf install lazygit"
   fi
 
   # ── WSL: install /etc/wsl.conf (systemd + default user + interop) ───────────
