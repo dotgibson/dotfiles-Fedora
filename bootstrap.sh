@@ -1,22 +1,14 @@
 #!/usr/bin/env bash
 # dotfiles-Fedora/bootstrap.sh
 # ──────────────────────────────────────────────────────────────────────────────
-# Provision a Fedora Workstation/Server box and wire up dotfiles. Idempotent —
+# Provision a Fedora box (Workstation or WSL) and wire up dotfiles. Idempotent —
 # safe to re-run. This is the OS-NATIVE layer; Core (zsh/tmux/nvim/git) is
 # vendored under core/ via git subtree and symlinked in by this script.
 #
 # Usage:
 #   ./bootstrap.sh                 # full: dnf packages + extras + symlinks
 #   ./bootstrap.sh --links-only    # just (re)create symlinks
-#   ./bootstrap.sh --no-flatpak    # skip Flathub/GUI apps
-#
-# Fedora specifics handled here:
-#   - dnf5 (default since Fedora 41) — `dnf` is the right command either way
-#   - RPM Fusion (free + nonfree) for codecs / extra packages
-#   - Flathub for GUI apps
-#   - Wayland-first clipboard (wl-clipboard); X11 fallback handled in os/fedora.zsh
-#   - a few modern CLI tools not always packaged are installed via official
-#     scripts / cargo so behavior matches the other distro repos
+#   ./bootstrap.sh --no-flatpak    # skip Flathub/GUI apps (recommended on WSL)
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -27,17 +19,22 @@ LINKS_ONLY=0; DO_FLATPAK=1
 for a in "$@"; do case "$a" in
   --links-only) LINKS_ONLY=1 ;;
   --no-flatpak) DO_FLATPAK=0 ;;
-  -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
   *) echo "unknown arg: $a" >&2; exit 1 ;;
 esac; done
 
 say(){ printf '\e[36m::\e[0m %s\n' "$*"; }
 ok(){  printf '\e[32m✓\e[0m %s\n' "$*"; }
 
+# ── Detect WSL ────────────────────────────────────────────────────────────────
+IS_WSL=0
+if [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
+  IS_WSL=1
+fi
+
 # ── sanity: confirm we're on Fedora ───────────────────────────────────────────
 if ! grep -qi fedora /etc/os-release 2>/dev/null; then
   echo "This bootstrap targets Fedora. /etc/os-release doesn't look like Fedora." >&2
-  echo "Use the matching distro repo instead." >&2
   exit 1
 fi
 
@@ -56,6 +53,16 @@ link(){  # link SRC -> DST, backing up any existing real file
   ln -s "$src" "$dst"
 }
 
+# ── read a package list, stripping inline (#...) comments + blank lines ───────
+read_pkgs(){  # $1 = file; prints clean package names, one per line
+  local line
+  while IFS= read -r line; do
+    line="${line%%#*}"               # drop everything from the first # onward
+    line="${line//[[:space:]]/}"     # package names contain no whitespace
+    [[ -n "$line" ]] && printf '%s\n' "$line"
+  done < "$1"
+}
+
 provision() {
   say "dnf upgrade refresh"
   sudo dnf -y makecache >/dev/null
@@ -68,9 +75,10 @@ provision() {
     >/dev/null 2>&1 || true
 
   say "dnf packages (from install/packages.txt)"
-  # shellcheck disable=SC2046
-  sudo dnf -y install $(grep -vE '^\s*#|^\s*$' "$DOTFILES/install/packages.txt" | tr '\n' ' ')
-  ok "dnf packages installed"
+  local -a pkgs=()
+  mapfile -t pkgs < <(read_pkgs "$DOTFILES/install/packages.txt")
+  sudo dnf -y install "${pkgs[@]}"
+  ok "dnf packages installed (${#pkgs[@]})"
 
   # Tools not reliably packaged on Fedora — match the other repos via upstream.
   if ! command -v starship >/dev/null; then
@@ -86,12 +94,18 @@ provision() {
     cargo install --locked yazi-fs yazi-cli >/dev/null 2>&1 || true
   fi
 
-  if (( DO_FLATPAK )); then
+  # ── WSL: install /etc/wsl.conf (systemd + default user + interop) ───────────
+  if (( IS_WSL )); then
+    say "installing /etc/wsl.conf (systemd + default user)"
+    local user; user="$(id -un)"
+    sed "s/__WSL_USER__/$user/" "$DOTFILES/wsl/wsl.conf" | sudo tee /etc/wsl.conf >/dev/null
+    ok "wsl.conf written — run 'wsl.exe --shutdown' from Windows, then reopen, to apply"
+  fi
+
+  if (( DO_FLATPAK )) && ! (( IS_WSL )); then
     say "Flathub"
     flatpak remote-add --if-not-exists flathub \
       https://flathub.org/repo/flathub.flatpakrepo >/dev/null 2>&1 || true
-    # GUI apps you actually want go here:
-    # flatpak install -y flathub com.github.tchx84.Flatseal
   fi
 }
 
@@ -107,7 +121,6 @@ wire_links() {
   say "symlinking Fedora OS-native layer"
   link "$DOTFILES/os/fedora.zsh" "$CONFIG/zsh/os.zsh"
 
-  # .zshrc sources core (tools -> aliases -> functions) then os.zsh last.
   if [[ ! -f "$HOME/.zshrc" ]] || ! grep -q "dotfiles-managed" "$HOME/.zshrc" 2>/dev/null; then
     say "writing .zshrc loader"
     cat > "$HOME/.zshrc" <<'ZRC'
