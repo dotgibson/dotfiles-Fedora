@@ -129,6 +129,15 @@ wire_links() {
   [[ -d "$DOTFILES/core/nvim" ]]           && link "$DOTFILES/core/nvim"           "$CONFIG/nvim"
   [[ -f "$DOTFILES/core/git/gitconfig" ]]  && link "$DOTFILES/core/git/gitconfig"  "$HOME/.gitconfig"
 
+  # OS-specific git layer (credential helper) -> included by Core's gitconfig
+  [[ -f "$DOTFILES/os/fedora.gitconfig" ]] && link "$DOTFILES/os/fedora.gitconfig" "$CONFIG/git/os.gitconfig"
+  # private identity file, seeded ONCE from the example (never tracked)
+  if [[ ! -f "$CONFIG/git/local.gitconfig" && -f "$DOTFILES/core/git/local.gitconfig.example" ]]; then
+    mkdir -p "$CONFIG/git"
+    cp "$DOTFILES/core/git/local.gitconfig.example" "$CONFIG/git/local.gitconfig"
+    say "seeded ~/.config/git/local.gitconfig — FILL IN your name & email"
+  fi
+
   # cross-OS helper scripts from Core onto PATH (~/.local/bin)
   if [[ -d "$DOTFILES/core/bin" ]]; then
     mkdir -p "$HOME/.local/bin"
