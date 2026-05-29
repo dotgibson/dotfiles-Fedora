@@ -133,6 +133,26 @@ wire_links() {
     link "$f" "$CONFIG/zsh/$(basename "$f")"
   done
   [[ -f "$DOTFILES/core/tmux/tmux.conf" ]] && link "$DOTFILES/core/tmux/tmux.conf" "$CONFIG/tmux/tmux.conf"
+  # tmux popup scripts (prefix w/T/f) — symlink the dir + ensure they're runnable
+  if [[ -d "$DOTFILES/core/tmux/scripts" ]]; then
+    link "$DOTFILES/core/tmux/scripts" "$CONFIG/tmux/scripts"
+    chmod +x "$DOTFILES"/core/tmux/scripts/*.sh 2>/dev/null || true
+  fi
+  # Fedora tmux bits (netspeed iface + battery) — optional; tmux.conf sources it
+  # with `-q`, so it's fine if os/fedora.conf doesn't exist yet.
+  [[ -f "$DOTFILES/os/fedora.conf" ]] && link "$DOTFILES/os/fedora.conf" "$CONFIG/tmux/os.conf"
+  # tmux plugin manager (tpm) — clone once so the theme + resurrect/continuum
+  # load. Plugins still need one install pass: `prefix+I` in tmux, or headless
+  # ~/.config/tmux/plugins/tpm/bin/install_plugins
+  if [[ ! -d "$CONFIG/tmux/plugins/tpm" ]]; then
+    say "cloning tpm (tmux plugin manager)"
+    git clone --depth=1 https://github.com/tmux-plugins/tpm "$CONFIG/tmux/plugins/tpm" >/dev/null 2>&1 \
+      && ok "tpm cloned — run prefix+I in tmux to install plugins" \
+      || say "tpm clone failed — clone it manually, then prefix+I"
+  fi
+  # starship prompt theme — symlink to the DEFAULT path (tools.zsh inits starship
+  # against ~/.config/starship.toml with no STARSHIP_CONFIG, same as the Mac).
+  [[ -f "$DOTFILES/core/starship/starship.toml" ]] && link "$DOTFILES/core/starship/starship.toml" "$CONFIG/starship.toml"
   [[ -d "$DOTFILES/core/nvim" ]]           && link "$DOTFILES/core/nvim"           "$CONFIG/nvim"
   [[ -f "$DOTFILES/core/mise/config.toml" ]] && link "$DOTFILES/core/mise/config.toml" "$CONFIG/mise/config.toml"
   [[ -f "$DOTFILES/core/git/gitconfig" ]]  && link "$DOTFILES/core/git/gitconfig"  "$HOME/.gitconfig"
@@ -150,21 +170,55 @@ wire_links() {
   if [[ -d "$DOTFILES/core/bin" ]]; then
     mkdir -p "$HOME/.local/bin"
     for s in clip clip-paste; do
-      [[ -f "$DOTFILES/core/bin/$s" ]] && link "$DOTFILES/core/bin/$s" "$HOME/.local/bin/$s"
+      if [[ -f "$DOTFILES/core/bin/$s" ]]; then
+        link "$DOTFILES/core/bin/$s" "$HOME/.local/bin/$s"
+        chmod +x "$DOTFILES/core/bin/$s" 2>/dev/null || true
+      fi
     done
   fi
 
   say "symlinking Fedora OS-native layer"
   link "$DOTFILES/os/fedora.zsh" "$CONFIG/zsh/os.zsh"
 
-  if [[ ! -f "$HOME/.zshrc" ]] || ! grep -q "dotfiles-managed" "$HOME/.zshrc" 2>/dev/null; then
+  if [[ ! -f "$HOME/.zshrc" ]] || ! grep -q "dotfiles-managed v2" "$HOME/.zshrc" 2>/dev/null; then
     say "writing .zshrc loader"
+    [[ -f "$HOME/.zshrc" ]] && cp "$HOME/.zshrc" "$HOME/.zshrc.pre-dotfiles.$(date +%s)"
     cat > "$HOME/.zshrc" <<'ZRC'
-# dotfiles-managed — do not hand-edit; put local tweaks in ~/.config/zsh/local.zsh
-ZDOTDIR_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/zsh"
-for m in tools aliases functions os local; do
-  [[ -r "$ZDOTDIR_CFG/$m.zsh" ]] && source "$ZDOTDIR_CFG/$m.zsh"
+# dotfiles-managed v2 — do not hand-edit; put local tweaks in ~/.config/zsh/local.zsh
+# Fedora has no ~/.zshenv, so this entry file also sets the env the Core modules
+# expect, then sources them in the ONE correct order. Mirror of the Mac's .zshrc.
+
+# ── XDG + env (no zshenv on Fedora) ───────────────────────────────────────────
+: "${XDG_CONFIG_HOME:=$HOME/.config}"
+: "${XDG_STATE_HOME:=$HOME/.local/state}"
+: "${XDG_CACHE_HOME:=$HOME/.cache}"
+export EDITOR=nvim VISUAL=nvim
+export NOTES_DIR="${NOTES_DIR:-$HOME/Notes}"
+
+# ── history ───────────────────────────────────────────────────────────────────
+HISTFILE="$XDG_STATE_HOME/zsh/history"
+mkdir -p "${HISTFILE:h}"
+HISTSIZE=100000
+SAVEHIST=100000
+setopt EXTENDED_HISTORY INC_APPEND_HISTORY SHARE_HISTORY
+setopt HIST_IGNORE_ALL_DUPS HIST_IGNORE_SPACE HIST_REDUCE_BLANKS HIST_VERIFY
+setopt AUTO_CD AUTO_PUSHD PUSHD_IGNORE_DUPS PUSHD_SILENT
+setopt INTERACTIVE_COMMENTS NO_BEEP
+
+# ── completion (MUST precede plugins.zsh / fzf-tab) ──────────────────────────
+autoload -Uz compinit
+_zcompdump="$XDG_CACHE_HOME/zsh/zcompdump"
+mkdir -p "${_zcompdump:h}"
+compinit -d "$_zcompdump"
+zstyle ':completion:*' menu no
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# ── Core modules + Fedora os layer + local overrides, in order ───────────────
+ZSH_CFG="$XDG_CONFIG_HOME/zsh"
+for _m in tools aliases functions fzf bindings plugins op os local; do
+  [[ -r "$ZSH_CFG/$_m.zsh" ]] && source "$ZSH_CFG/$_m.zsh"
 done
+unset _m _zcompdump
 ZRC
   fi
 
@@ -184,3 +238,4 @@ ZRC
 (( LINKS_ONLY )) || provision
 wire_links
 ok "Fedora bootstrap complete — open a new shell or: exec zsh"
+
