@@ -29,7 +29,8 @@ os/fedora.zsh         OS-native shell layer -> symlinked to ~/.config/zsh/os.zsh
 core/                 vendored from dotfiles-core (git subtree; do not hand-edit)
 ```
 
-Load order in `.zshrc`: `core/tools → core/aliases → core/functions → os/fedora → local`.
+Load order in `.zshrc`: `core/tools → core/aliases → core/functions → core/fzf →
+core/bindings → core/plugins → core/op → os/fedora → local`.
 
 ## Fedora specifics baked in
 
