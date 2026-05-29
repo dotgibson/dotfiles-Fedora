@@ -45,3 +45,4 @@ wget
 jq
 htop
 flatpak
+gawk

@@ -59,3 +59,10 @@ se-restore() { sudo restorecon -Rv "${1:?usage: se-restore <path>}"; }
 alias se-why='sudo journalctl -t setroubleshoot --since "10 min ago" 2>/dev/null'
 
 unset _IS_WSL
+
+# ── auto-start/attach tmux for interactive terminals ─────────────────────────
+# Skip inside an existing tmux, VS Code's integrated terminal, and non-TTYs.
+if command -v tmux >/dev/null 2>&1 \
+   && [[ -z "$TMUX" && -t 1 && "$TERM_PROGRAM" != "vscode" ]]; then
+  tmux attach -t main 2>/dev/null || tmux new-session -s main
+fi
