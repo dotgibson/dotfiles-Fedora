@@ -7,3 +7,4 @@ zsh/local.zsh
 .env
 .env.*
 !.env.example
+core/nvim/lazy-lock.json
