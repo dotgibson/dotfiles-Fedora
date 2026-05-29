@@ -24,6 +24,18 @@ fi
 command -v clip       >/dev/null && alias pbcopy='clip'
 command -v clip-paste >/dev/null && alias pbpaste='clip-paste'
 
+# ── tool completions / shell hooks (parity with the Mac os layer) ────────────
+# Each guarded — silently skipped if the tool isn't installed on this box.
+command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"
+command -v gh     >/dev/null 2>&1 && eval "$(gh completion -s zsh 2>/dev/null)"
+command -v uv     >/dev/null 2>&1 && eval "$(uv generate-shell-completion zsh 2>/dev/null)"
+command -v ty     >/dev/null 2>&1 && eval "$(ty generate-shell-completion zsh 2>/dev/null)"
+
+# ── conveniences ──────────────────────────────────────────────────────────────
+alias dotsync='cd "$HOME/dotfiles-Fedora"'              # jump to this repo
+command -v op >/dev/null 2>&1 && alias opsignin='eval "$(op signin)"'
+alias localip='ip -brief -4 addr show scope global'     # iface + LAN IP(s)
+
 # ── WSL-only niceties (interop reach-arounds into Windows) ───────────────────
 if (( _IS_WSL )); then
   alias open='explorer.exe'                 # `open .` opens the dir in Explorer
