@@ -33,6 +33,12 @@ gcc
 make
 cargo          # rust toolchain -> cargo install fallback for yazi/dust/procs
 
+# ── Neovim provider deps (fix :checkhealth; use dnf NOT pip — F44 python is PEP668-managed)
+python3-neovim # pynvim — the Python 3 provider module
+python3-pip    # pip for the system python
+# rust-analyzer  # uncomment if you use the Rust LSP (rustaceanvim wants it)
+# golang         # uncomment if you want the Go LSP (gopls) + Go tooling
+
 # ── misc useful ───────────────────────────────────────────────
 curl
 wget
