@@ -1,13 +1,13 @@
 # CLAUDE.md — dotfiles-Fedora
 
 Project memory for Claude Code, auto-loaded every session. For the shared Core
-rules (the "is it Core?" test, the manifest contract, the load order) see
-`core/CLAUDE.md` and `core/CONTRIBUTING.md`.
+rules (the load order, the "is it Core?" test, the manifest contract) see
+`core/README.md` and `core/CONTRIBUTING.md`.
 
 ## What this repo is
 
-`dotfiles-Fedora` is the **OS-native layer for Fedora — the **template** the other Linux repos are stamped from** of a ten-repo, three-layer dotfiles fleet
-(Core → OS-native → Role → Showcase). It is the reference build: changes to the OS-native *structure* start here, then propagate to Arch/openSUSE/Alpine/Gentoo per `core/PORTING-MATRIX.md`. `dnf` + RPM Fusion.
+`dotfiles-Fedora` is the **OS-native layer for Fedora** in a **nine-repo dotfiles system** built on a three-layer
+model (Core → OS-native → Role). Fedora is the **template** the other Linux repos are stamped from: OS-native structure changes start here, then propagate per `core/PORTING-MATRIX.md`. `dnf` + RPM Fusion.
 
 ## The rule that bites
 
