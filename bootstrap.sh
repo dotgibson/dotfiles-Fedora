@@ -217,30 +217,22 @@ wire_links() {
 export EDITOR=nvim VISUAL=nvim
 export NOTES_DIR="${NOTES_DIR:-$HOME/Notes}"
 
-# ── history ───────────────────────────────────────────────────────────────────
-HISTFILE="$XDG_STATE_HOME/zsh/history"
-mkdir -p "${HISTFILE:h}"
-HISTSIZE=100000
-SAVEHIST=100000
-setopt EXTENDED_HISTORY INC_APPEND_HISTORY SHARE_HISTORY
-setopt HIST_IGNORE_ALL_DUPS HIST_IGNORE_SPACE HIST_REDUCE_BLANKS HIST_VERIFY
-setopt AUTO_CD AUTO_PUSHD PUSHD_IGNORE_DUPS PUSHD_SILENT
-setopt INTERACTIVE_COMMENTS NO_BEEP
-
-# ── completion (MUST precede plugins.zsh / fzf-tab) ──────────────────────────
-autoload -Uz compinit
-_zcompdump="$XDG_CACHE_HOME/zsh/zcompdump"
-mkdir -p "${_zcompdump:h}"
-compinit -d "$_zcompdump"
-zstyle ':completion:*' menu no
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
-
-# ── Core modules + Fedora os layer + local overrides, in order ───────────────
-ZSH_CFG="$XDG_CONFIG_HOME/zsh"
-for _m in tools aliases functions fzf bindings plugins op os local; do
-  [[ -r "$ZSH_CFG/$_m.zsh" ]] && source "$ZSH_CFG/$_m.zsh"
-done
-unset _m _zcompdump
+# ── Core modules + Fedora os layer + local overrides, in canonical order ──
+# history.zsh owns HISTFILE/HISTSIZE + history setopts; options.zsh owns the nav/glob
+# setopts + compinit + completion zstyles — so this entry file no longer hand-rolls
+# them. It declares the load order and sources the vendored Core loader
+# (core/zsh/loader.zsh -> $ZSH_CFG/loader.zsh), which byte-compiles + sources each
+# module. Loading the FULL set (ui/git/maint/update were silently missing) is the fix.
+: "${ZDOTDIR:=$XDG_CONFIG_HOME/zsh}"
+export ZDOTDIR              # Core modules (history/options) key state off ZDOTDIR;
+ZSH_CFG="$ZDOTDIR"          # align the loader to the SAME dir so state never splits
+_CORE_MODULES=(tools ui options history aliases git functions fzf bindings plugins op maint update os local)
+if [[ -r "$ZSH_CFG/loader.zsh" ]]; then
+  source "$ZSH_CFG/loader.zsh"
+else
+  print -u2 -- "zshrc: Core loader not found at $ZSH_CFG/loader.zsh — re-run the dotfiles bootstrap to (re)link Core."
+fi
+unset _CORE_MODULES
 ZRC
 	fi
 
