@@ -14,8 +14,9 @@ name: lint
 #     Lua linter here would only ever lint vendored code this repo can't change.
 #   • shfmt is ADVISORY, not blocking. bootstrap scripts across the fleet use
 #     mixed tab/space styles; hard-gating one would force an out-of-scope
-#     reformat. It still reports drift against the .editorconfig 2-space spec
-#     (formatting IS evaluated) without failing the build on pre-existing style.
+#     reformat. It still reports drift against a 2-space indent spec (matching
+#     core/.editorconfig, enforced here via `shfmt -i 2` — there is no repo-root
+#     .editorconfig) so formatting IS evaluated, without failing on existing style.
 #
 # Pinned linter versions come from the vendored Core single source
 # (core/scripts/tool-versions.env), so a Core bump propagates on the next subtree
@@ -29,8 +30,10 @@ on:
   pull_request:
     paths-ignore: ["**.md", "LICENSE"]
 
-# One in-flight run per ref: a new push cancels the superseded run, and the
-# push + pull_request double-trigger on a same-repo PR collapses to one run.
+# One in-flight run per ref: a new push to a PR branch cancels the now-superseded
+# run rather than letting a stale job burn minutes next to the fresh one. (push is
+# scoped to main/master below, so there is no push+pull_request double-trigger to
+# dedupe on a feature-branch PR — this group only collapses successive PR pushes.)
 concurrency:
   group: lint-${{ github.ref }}
   cancel-in-progress: true
@@ -51,7 +54,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Load pinned tool versions (vendored Core single source)
-        run: grep -E '^SHELLCHECK_VERSION=' core/scripts/tool-versions.env >> "$GITHUB_ENV"
+        run: |
+          f=core/scripts/tool-versions.env
+          if [ ! -f "$f" ]; then echo "::error::$f missing — is the Core subtree vendored?"; exit 1; fi
+          grep -E '^SHELLCHECK_VERSION=' "$f" >> "$GITHUB_ENV" \
+            || { echo "::error::SHELLCHECK_VERSION not found in $f (renamed upstream?)"; exit 1; }
 
       - name: Install zsh (for zsh -n on the repo-owned zsh modules)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zsh
@@ -111,7 +118,12 @@ jobs:
         run: |
           mapfile -t files < <(git ls-files '*.sh' ':!:core/**')
           if [ ${#files[@]} -eq 0 ]; then echo "no repo-owned .sh"; exit 0; fi
-          for f in "${files[@]}"; do bash -n "$f" && echo "ok: $f"; done
+          # Accumulate into rc rather than `bash -n "$f" && echo`: under the runner's
+          # `set -e`, a failing command in a `&&` list is exempt from errexit, so a
+          # parse error in a non-final file would not fail the step. Mirror zsh -n.
+          rc=0
+          for f in "${files[@]}"; do echo "bash -n $f"; bash -n "$f" || rc=1; done
+          exit $rc
 
       # ── BLOCKING: zsh parse gate. shellcheck/shfmt don't speak zsh, so the
       # repo-owned zsh modules (os/*.zsh, and Kali's offensive/*.zsh) are gated
@@ -124,10 +136,12 @@ jobs:
           for f in "${files[@]}"; do echo "zsh -n $f"; zsh -n "$f" || rc=1; done
           exit $rc
 
-      # ── ADVISORY: formatting against the .editorconfig 2-space spec. Reports
-      # drift as a warning annotation but never fails the build (see header).
+      # ── ADVISORY: formatting against a 2-space indent spec (matching
+      # core/.editorconfig), enforced via `shfmt -i 2`. The if/else
+      # below swallows shfmt's drift exit (always ends on an echo → status 0), so
+      # the step is non-blocking WITHOUT continue-on-error — which is deliberately
+      # omitted so a genuinely unexpected failure (e.g. a broken install) still reds.
       - name: shfmt (format check — advisory)
-        continue-on-error: true
         run: |
           mapfile -t files < <(git ls-files '*.sh' ':!:core/**')
           if [ ${#files[@]} -eq 0 ]; then echo "no repo-owned .sh"; exit 0; fi
@@ -144,7 +158,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Load pinned tool versions (vendored Core single source)
-        run: grep -E '^ACTIONLINT_VERSION=' core/scripts/tool-versions.env >> "$GITHUB_ENV"
+        run: |
+          f=core/scripts/tool-versions.env
+          if [ ! -f "$f" ]; then echo "::error::$f missing — is the Core subtree vendored?"; exit 1; fi
+          grep -E '^ACTIONLINT_VERSION=' "$f" >> "$GITHUB_ENV" \
+            || { echo "::error::ACTIONLINT_VERSION not found in $f (renamed upstream?)"; exit 1; }
 
       - name: Cache actionlint (pinned)
         uses: actions/cache@v4
