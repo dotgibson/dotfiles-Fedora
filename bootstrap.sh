@@ -95,8 +95,15 @@ provision() {
   # dnf5 fails the WHOLE transaction if any single requested pkg is unavailable
   # (and is fussy about already-installed ones) — --skip-unavailable makes the
   # bulk install resilient: missing names are skipped instead of aborting.
-  sudo dnf -y install --skip-unavailable "${pkgs[@]}"
-  blib_ok "dnf packages installed (${#pkgs[@]} requested)"
+  # Guard the empty case: an all-comment/blank packages.txt yields a zero-length
+  # array, and `dnf install` with no args errors out — aborting the whole bootstrap
+  # under `set -e`. Skip the install instead and carry on with the rest.
+  if ((${#pkgs[@]})); then
+    sudo dnf -y install --skip-unavailable "${pkgs[@]}"
+    blib_ok "dnf packages installed (${#pkgs[@]} requested)"
+  else
+    blib_warn "install/packages.txt lists no packages — skipping dnf install"
+  fi
 
   # Tools not reliably packaged on Fedora — match the other repos via upstream.
   if ! command -v starship >/dev/null; then
