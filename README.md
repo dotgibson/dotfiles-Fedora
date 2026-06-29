@@ -1,4 +1,13 @@
-# dotfiles-Fedora
+# 🎩 dotfiles-Fedora
+
+**Fedora — the template layer.** The Fedora layer (dnf + RPM Fusion) — the
+template the other Linux repos are stamped from.
+
+`dnf` · `zsh` · `nvim` · `tmux`
+
+[![showcase](https://img.shields.io/badge/showcase-live-7aa2f7?style=flat-square)](https://gerrrt.github.io/dotfiles-web/) ![Linux](https://img.shields.io/badge/Linux-template-7aa2f7?style=flat-square)
+
+---
 
 The **OS-native layer** for Fedora. Core (zsh/tmux/nvim/git) is vendored under
 `core/` from [`dotfiles-core`](../dotfiles-core); this repo adds only what is
