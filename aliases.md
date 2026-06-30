@@ -1,11 +1,11 @@
 # Fedora Aliases Cheat Sheet
 
-OS-specific aliases from `os/fedora.zsh`. See `core/` for the universal alias
+OS-specific aliases from `os/fedora.zsh`. See [`core/aliases.md`](core/aliases.md) for the universal alias
 reference (modern CLI, git, safety nets) that applies on every machine.
 
 ## Package Management (dnf)
 
-| Alias | Expands To |
+| Alias | Expands to |
 |-------|------------|
 | `dnfi` | `sudo dnf install` |
 | `dnfs` | `dnf search` |
@@ -17,7 +17,7 @@ reference (modern CLI, git, safety nets) that applies on every machine.
 
 ## Flatpak
 
-| Alias | Expands To |
+| Alias | Expands to |
 |-------|------------|
 | `fpi` | `flatpak install flathub` |
 | `fpu` | `flatpak update` |
@@ -26,7 +26,7 @@ reference (modern CLI, git, safety nets) that applies on every machine.
 
 ## SELinux
 
-| Alias | Expands To |
+| Alias | Expands to |
 |-------|------------|
 | `se-status` | `sestatus` (or message when not active) |
 | `se-denials` | Recent AVC denials via `ausearch` |
@@ -35,7 +35,7 @@ reference (modern CLI, git, safety nets) that applies on every machine.
 
 ## Clipboard / WSL2 / Navigation
 
-| Alias | Expands To | Condition |
+| Alias | Expands to | Condition |
 |-------|-----------|----------|
 | `pbcopy` | `clip` | clip available |
 | `pbpaste` | `clip-paste` | clip-paste available |
