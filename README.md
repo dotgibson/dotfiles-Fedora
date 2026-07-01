@@ -5,7 +5,7 @@ template the other Linux repos are stamped from.
 
 `dnf` · `zsh` · `nvim` · `tmux`
 
-[![showcase](https://img.shields.io/badge/showcase-live-7aa2f7?style=flat-square)](https://gerrrt.github.io/dotfiles-web/) ![Linux](https://img.shields.io/badge/Linux-template-7aa2f7?style=flat-square)
+[![showcase](https://img.shields.io/badge/showcase-live-7aa2f7?style=flat-square)](https://dotgibson.github.io/dotfiles-web/) ![Linux](https://img.shields.io/badge/Linux-template-7aa2f7?style=flat-square)
 
 ---
 
