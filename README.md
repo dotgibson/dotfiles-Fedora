@@ -203,4 +203,4 @@ Project Link: [dotgibson](https://github.com/dotgibson/)
 [issues-url]: https://github.com/dotgibson/dotfiles-Fedora/issues
 [license-shield]: https://img.shields.io/github/license/dotgibson/dotfiles-Fedora.svg?style=flat-square
 [license-url]: https://github.com/dotgibson/dotfiles-Fedora/blob/main/LICENSE
-[docs]: https://dotgibson.github.io/dotfiles-web/
+[docs]: https://dotgibson.github.io/dotfiles-web/docs
