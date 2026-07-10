@@ -78,7 +78,7 @@ IS_WSL=0
 if blib_is_wsl; then IS_WSL=1; fi
 
 provision() {
-  blib_say "dnf upgrade refresh"
+  blib_say "dnf metadata refresh (makecache)"
   sudo dnf -y makecache >/dev/null
 
   blib_say "RPM Fusion (free + nonfree)"
