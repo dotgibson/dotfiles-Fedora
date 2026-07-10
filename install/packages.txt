@@ -18,6 +18,17 @@ git-delta      # git pager / diffs
 btop           # top/htop
 tealdeer       # tldr (fast Rust client; binary: tldr)
 
+# ── modern CLI extras (core-doctor probes these; all in Fedora repos) ─
+duf            # df   (disk usage/free)
+procs          # ps
+sd             # sed  (fast find/replace)
+yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (python-yq is the separate Python tool)
+gron           # greppable JSON
+glow           # markdown viewer
+gum            # shell-script UI toolkit (charm)
+# dust, xh, doggo, carapace, sesh, op (1Password CLI): NOT reliably in Fedora
+# 41/42 repos — bootstrap.sh installs them via cargo / go / the 1Password repo.
+
 # ── editor + git workflow ─────────────────────────────────────
 neovim
 git
@@ -33,7 +44,7 @@ xclip          # X11 fallback (sessions / SSH X-forward)
 gcc
 gcc-c++        # C++ compiler — Fedora's gcc is C-only; some tree-sitter parsers ship C++ scanners
 make
-cargo          # rust toolchain -> cargo install fallback for yazi/dust/procs
+cargo          # rust toolchain -> cargo install fallback for yazi/dust/xh
 
 # ── Neovim provider deps (fix :checkhealth; use dnf NOT pip — F44 python is PEP668-managed)
 python3-neovim # pynvim — the Python 3 provider module

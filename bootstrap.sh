@@ -134,6 +134,52 @@ provision() {
       echo "   lazygit COPR install failed; do it later: sudo dnf copr enable atim/lazygit && sudo dnf install lazygit"
   fi
 
+  # ── doctor-probed tools not (reliably) in Fedora 41/42 repos ────────────────
+  # Round out core-doctor's modern-CLI set. All best-effort (|| true) + presence-
+  # guarded — same discipline as starship/atuin/yazi above; a failure here never
+  # aborts bootstrap. dust/xh via cargo (dust lands in the F43 repo — revisit then);
+  # doggo/carapace/sesh via go install (using an ephemeral mise-provided go when the
+  # toolchain isn't already present); op via 1Password's official dnf repo.
+  _dotfiles_go_install() { # <import-path@version> <binary-name>
+    if command -v "$2" >/dev/null 2>&1; then return 0; fi
+    if command -v go >/dev/null 2>&1; then
+      go install "$1" >/dev/null 2>&1 || true
+    elif command -v mise >/dev/null 2>&1; then
+      mise exec go@latest -- go install "$1" >/dev/null 2>&1 || true
+    else
+      echo "   $2: needs Go — install later with: go install $1"
+    fi
+    return 0
+  }
+  if ! command -v dust >/dev/null && command -v cargo >/dev/null; then
+    blib_say "dust (cargo — crate du-dust; not in F41/42 repos yet)"
+    cargo install --locked du-dust >/dev/null 2>&1 || true
+  fi
+  if ! command -v xh >/dev/null && command -v cargo >/dev/null; then
+    blib_say "xh (cargo; not in Fedora repos)"
+    cargo install --locked xh >/dev/null 2>&1 || true
+  fi
+  blib_say "doggo / carapace / sesh (go install where absent)"
+  _dotfiles_go_install github.com/mr-karan/doggo/cmd/doggo@latest doggo
+  _dotfiles_go_install github.com/carapace-sh/carapace-bin/cmd/carapace@latest carapace
+  _dotfiles_go_install github.com/joshmedeski/sesh/v2@latest sesh
+  # op — 1Password CLI, via 1Password's official signed dnf repo.
+  if ! command -v op >/dev/null; then
+    blib_say "op (1Password CLI — official repo)"
+    sudo rpm --import https://downloads.1password.com/linux/keys/1password.asc >/dev/null 2>&1 || true
+    sudo sh -c 'cat >/etc/yum.repos.d/1password.repo' <<'REPO' 2>/dev/null || true
+[1password]
+name=1Password Stable Channel
+baseurl=https://downloads.1password.com/linux/rpm/stable/$basearch
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey="https://downloads.1password.com/linux/keys/1password.asc"
+REPO
+    sudo dnf -y install 1password-cli >/dev/null 2>&1 ||
+      echo "   op install failed; see developer.1password.com/docs/cli/get-started"
+  fi
+
   # ── WSL: install /etc/wsl.conf (systemd + default user + interop) ───────────
   if ((IS_WSL)); then
     blib_say "installing /etc/wsl.conf (systemd + default user)"
