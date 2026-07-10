@@ -140,14 +140,18 @@ provision() {
   # aborts bootstrap. dust/xh via cargo (dust lands in the F43 repo — revisit then);
   # doggo/carapace/sesh via go install (using an ephemeral mise-provided go when the
   # toolchain isn't already present); op via 1Password's official dnf repo.
+  # GOBIN → ~/.local/bin so go-installed binaries land on PATH (the Fedora shell
+  # layer prefixes ~/.local/bin + ~/.cargo/bin, but NOT go's default ~/go/bin).
   _dotfiles_go_install() { # <import-path@version> <binary-name>
     if command -v "$2" >/dev/null 2>&1; then return 0; fi
+    local gobin="$HOME/.local/bin"
+    mkdir -p "$gobin"
     if command -v go >/dev/null 2>&1; then
-      go install "$1" >/dev/null 2>&1 || true
+      GOBIN="$gobin" go install "$1" >/dev/null 2>&1 || true
     elif command -v mise >/dev/null 2>&1; then
-      mise exec go@latest -- go install "$1" >/dev/null 2>&1 || true
+      GOBIN="$gobin" mise exec go@latest -- go install "$1" >/dev/null 2>&1 || true
     else
-      echo "   $2: needs Go — install later with: go install $1"
+      echo "   $2: needs Go — install later with: GOBIN=$gobin go install $1"
     fi
     return 0
   }
@@ -174,7 +178,7 @@ baseurl=https://downloads.1password.com/linux/rpm/stable/$basearch
 enabled=1
 gpgcheck=1
 repo_gpgcheck=1
-gpgkey="https://downloads.1password.com/linux/keys/1password.asc"
+gpgkey=https://downloads.1password.com/linux/keys/1password.asc
 REPO
     sudo dnf -y install 1password-cli >/dev/null 2>&1 ||
       echo "   op install failed; see developer.1password.com/docs/cli/get-started"
