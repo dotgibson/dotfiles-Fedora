@@ -143,13 +143,16 @@ provision() {
   # GOBIN → ~/.local/bin so go-installed binaries land on PATH (the Fedora shell
   # layer prefixes ~/.local/bin + ~/.cargo/bin, but NOT go's default ~/go/bin).
   _dotfiles_go_install() { # <import-path@version> <binary-name>
+    [ "$#" -ge 2 ] || return 0
     if command -v "$2" >/dev/null 2>&1; then return 0; fi
     local gobin="$HOME/.local/bin"
-    mkdir -p "$gobin"
+    mkdir -p "$gobin" 2>/dev/null || true
     if command -v go >/dev/null 2>&1; then
-      GOBIN="$gobin" go install "$1" >/dev/null 2>&1 || true
+      GOBIN="$gobin" go install "$1" >/dev/null 2>&1 ||
+        echo "   $2: go install failed — retry later: GOBIN=$gobin go install $1"
     elif command -v mise >/dev/null 2>&1; then
-      GOBIN="$gobin" mise exec go@latest -- go install "$1" >/dev/null 2>&1 || true
+      GOBIN="$gobin" mise exec go@latest -- go install "$1" >/dev/null 2>&1 ||
+        echo "   $2: go install failed — retry later: GOBIN=$gobin go install $1"
     else
       echo "   $2: needs Go — install later with: GOBIN=$gobin go install $1"
     fi
