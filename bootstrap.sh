@@ -108,7 +108,7 @@ provision() {
   # Tools not reliably packaged on Fedora — match the other repos via upstream.
   if ! command -v starship >/dev/null; then
     blib_say "starship (official installer)"
-    curl -fsSL https://starship.rs/install.sh | sh -s -- -y >/dev/null
+    curl -fsSL https://starship.rs/install.sh | sh -s -- -y >/dev/null || true
   fi
   if ! command -v atuin >/dev/null; then
     blib_say "atuin (official installer)"
