@@ -23,11 +23,12 @@ duf            # df   (disk usage/free)
 procs          # ps
 sd             # sed  (fast find/replace)
 yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (python-yq is the separate Python tool)
-gron           # greppable JSON
 glow           # markdown viewer
 gum            # shell-script UI toolkit (charm)
-# dust, xh, doggo, carapace, sesh, op (1Password CLI): NOT reliably in Fedora
-# 41/42 repos — bootstrap.sh installs them via cargo / go / the 1Password repo.
+# dust, xh, doggo, carapace, sesh, gron, op (1Password CLI): NOT reliably in Fedora
+# repos — bootstrap.sh installs them via cargo / go / the 1Password repo. gron was
+# orphaned and dropped from Fedora (last shipped F41/42), so `dnf install gron` now
+# fails — hence the go-install fallback.
 
 # ── editor + git workflow ─────────────────────────────────────
 neovim
@@ -57,7 +58,10 @@ tree-sitter-cli # nvim-treesitter (main branch) compiles parsers locally — nee
 
 # ── misc useful ───────────────────────────────────────────────
 curl
-wget
+wget           # F42+ has no package literally named `wget`: it's a virtual capability
+               # whose default provider is `wget2-wget` (wget2). `dnf install wget`
+               # still resolves, but installs wget2 — pin `wget1-wget` if you need
+               # classic GNU wget semantics (--show-progress, FTP, WARC).
 jq
 htop
 flatpak
