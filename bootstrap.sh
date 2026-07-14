@@ -166,6 +166,12 @@ provision() {
     blib_say "xh (cargo; not in Fedora repos)"
     cargo install --locked xh >/dev/null 2>&1 || true
   fi
+  # viddy (watch replacement; Core aliases watch->viddy, HAVE_VIDDY-guarded) is a Rust
+  # CLI, not in Fedora repos — build from source via cargo like dust/xh above.
+  if ! command -v viddy >/dev/null && command -v cargo >/dev/null; then
+    blib_say "viddy (cargo — watch replacement; not in Fedora repos)"
+    cargo install --locked viddy >/dev/null 2>&1 || true
+  fi
   blib_say "doggo / carapace / sesh / gron (go install where absent)"
   _dotfiles_go_install github.com/mr-karan/doggo/cmd/doggo@latest doggo
   _dotfiles_go_install github.com/carapace-sh/carapace-bin/cmd/carapace@latest carapace
