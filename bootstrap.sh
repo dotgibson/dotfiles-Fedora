@@ -166,16 +166,19 @@ provision() {
     blib_say "xh (cargo; not in Fedora repos)"
     cargo install --locked xh >/dev/null 2>&1 || true
   fi
-  blib_say "doggo / carapace / sesh / gron / viddy (go install where absent)"
+  # viddy (watch replacement; Core aliases watch->viddy, HAVE_VIDDY-guarded) is a Rust
+  # CLI, not in Fedora repos — build from source via cargo like dust/xh above.
+  if ! command -v viddy >/dev/null && command -v cargo >/dev/null; then
+    blib_say "viddy (cargo — watch replacement; not in Fedora repos)"
+    cargo install --locked viddy >/dev/null 2>&1 || true
+  fi
+  blib_say "doggo / carapace / sesh / gron (go install where absent)"
   _dotfiles_go_install github.com/mr-karan/doggo/cmd/doggo@latest doggo
   _dotfiles_go_install github.com/carapace-sh/carapace-bin/cmd/carapace@latest carapace
   _dotfiles_go_install github.com/joshmedeski/sesh/v2@latest sesh
   # gron was orphaned + dropped from Fedora (last in F41/42), so `dnf install gron`
   # fails on current releases — install it from source like the others above.
   _dotfiles_go_install github.com/tomnomnom/gron@latest gron
-  # viddy (watch replacement; Core aliases watch->viddy, HAVE_VIDDY-guarded) is not in
-  # Fedora repos — install from source like the others above.
-  _dotfiles_go_install github.com/sachaos/viddy@latest viddy
   # op — 1Password CLI, via 1Password's official signed dnf repo.
   if ! command -v op >/dev/null; then
     blib_say "op (1Password CLI — official repo)"
