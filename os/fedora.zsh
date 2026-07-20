@@ -32,10 +32,10 @@ command -v clip-paste >/dev/null && alias pbpaste='clip-paste'
 # ── tool completions / shell hooks (parity with the Mac os layer) ────────────
 # direnv/gh/uv/ty emit DETERMINISTIC scripts (the generated hook/completion TEXT is static
 # for a given binary; only the runtime hooks vary per-dir/-shell), so route them through
-# Core's _cache_eval (tools.zsh) — one cheap `source` of a cached file instead of forking
+# Core's _cache_eval (00-tools.zsh) — one cheap `source` of a cached file instead of forking
 # each generator on EVERY interactive shell. _cache_eval self-guards on the binary being
 # present and regenerates only when it's newer than the cache. Falls back to the eager
-# eval if this OS layer is sourced without Core's tools.zsh — the fallback
+# eval if this OS layer is sourced without Core's 00-tools.zsh — the fallback
 # keeps direnv's stderr visible, while the cached path suppresses the generator's
 # stderr (as _cache_eval does); direnv's per-dir runtime warnings are unaffected.
 if (( $+functions[_cache_eval] )); then
@@ -64,7 +64,7 @@ if (( _IS_WSL )); then
   [[ -n "${WINHOME:-}" ]] && alias cdwin='cd "$WINHOME"'
 fi
 
-# ── Fedora ships fd as `fd` (not fdfind) — tools.zsh already resolved this. ───
+# ── Fedora ships fd as `fd` (not fdfind) — 00-tools.zsh already resolved this. ───
 
 # ── dnf quality-of-life (dnf5 default since F41; commands are identical) ──────
 alias dnfi='sudo dnf install'
