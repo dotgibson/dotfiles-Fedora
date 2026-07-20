@@ -128,7 +128,7 @@ prompt — comes from vendored Core; this repo owns the Fedora specifics:
 
 - `bootstrap.sh` — `dnf` provision + Core/OS symlink wiring (idempotent)
 - `install/packages.txt` — the `dnf` package list (modern CLI stack)
-- `os/fedora.zsh` — clipboard + package-manager aliases → `~/.config/zsh/os.zsh`
+- `os/fedora.zsh` — clipboard + package-manager aliases → `~/.config/zsh/80-os.zsh`
 - `core/` — vendored from `dotfiles-core` (read-only here; edit upstream)
 
 The things that actually bite on Fedora — dnf5, RPM Fusion, the Wayland clipboard

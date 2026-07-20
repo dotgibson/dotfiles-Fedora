@@ -1,6 +1,6 @@
 # dotfiles-Fedora/os/fedora.zsh
 # ──────────────────────────────────────────────────────────────────────────────
-# The Fedora OS-native shell layer. Symlinked to ~/.config/zsh/os.zsh and loaded
+# The Fedora OS-native shell layer. Symlinked to ~/.config/zsh/80-os.zsh and loaded
 # AFTER Core (tools/aliases/functions). Fedora-specific only.
 # Works on Fedora Workstation (Wayland/X11) AND WSL.
 #
