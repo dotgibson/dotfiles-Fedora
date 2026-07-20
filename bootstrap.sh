@@ -119,7 +119,7 @@ provision() {
     cargo install --locked yazi-fs yazi-cli >/dev/null 2>&1 || true
   fi
   # mise — polyglot runtime manager (node/python/go/...). Portable; activated in
-  # core/zsh/tools.zsh. Install the binary here; runtimes are fetched separately
+  # core/zsh/00-tools.zsh. Install the binary here; runtimes are fetched separately
   # with `mise install` (kept out of bootstrap so it stays fast/predictable).
   if ! command -v mise >/dev/null && [[ ! -x "$HOME/.local/bin/mise" ]]; then
     blib_say "mise (official installer)"
