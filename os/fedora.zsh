@@ -59,7 +59,7 @@ alias localip='ip -brief -4 addr show scope global'     # iface + LAN IP(s)
 if (( _IS_WSL )); then
   alias open='explorer.exe'                 # `open .` opens the dir in Explorer
   command -v wslview >/dev/null && alias xdg-open='wslview'
-  # jump to your Windows user home: set WINHOME in local.zsh, e.g.
+  # jump to your Windows user home: set WINHOME in 99-local.zsh, e.g.
   #   export WINHOME="/mnt/c/Users/<you>"
   [[ -n "${WINHOME:-}" ]] && alias cdwin='cd "$WINHOME"'
 fi
