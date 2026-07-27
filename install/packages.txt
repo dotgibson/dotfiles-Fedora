@@ -63,6 +63,7 @@ wget           # F42+ has no package literally named `wget`: it's a virtual capa
                # still resolves, but installs wget2 — pin `wget1-wget` if you need
                # classic GNU wget semantics (--show-progress, FTP, WARC).
 jq
+w3m            # terminal web browser (text-mode; renders tables + inline images)
 htop
 flatpak
 gawk
