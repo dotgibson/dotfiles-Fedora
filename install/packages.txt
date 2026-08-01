@@ -46,7 +46,10 @@ xclip          # X11 fallback (sessions / SSH X-forward)
 gcc
 gcc-c++        # C++ compiler — Fedora's gcc is C-only; some tree-sitter parsers ship C++ scanners
 make
-cargo          # rust toolchain -> cargo install fallback for yazi/dust/xh/sd
+cargo          # rust toolchain -> backstops every `cargo install` in bootstrap.sh
+               # (currently yazi, dust, xh, viddy, sd, and tree-sitter-cli if the
+               # packaged one is too old). Don't drop it: that list only grows as
+               # Fedora retires Rust CLIs — keep this generic rather than enumerated.
 
 # ── Neovim provider deps (fix :checkhealth; use dnf NOT pip — F44 python is PEP668-managed)
 python3-neovim # pynvim — the Python 3 provider module
