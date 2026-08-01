@@ -21,14 +21,15 @@ tealdeer       # tldr (fast Rust client; binary: tldr)
 # ── modern CLI extras (core-doctor probes these; all in Fedora repos) ─
 duf            # df   (disk usage/free)
 procs          # ps
-sd             # sed  (fast find/replace)
 yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (python-yq is the separate Python tool)
 glow           # markdown viewer
 gum            # shell-script UI toolkit (charm)
-# dust, xh, doggo, carapace, sesh, gron, op (1Password CLI): NOT reliably in Fedora
-# repos — bootstrap.sh installs them via cargo / go / the 1Password repo. gron was
-# orphaned and dropped from Fedora (last shipped F41/42), so `dnf install gron` now
-# fails — hence the go-install fallback.
+# dust, xh, sd, doggo, carapace, sesh, gron, op (1Password CLI): NOT reliably in
+# Fedora repos — bootstrap.sh installs them via cargo / go / the 1Password repo.
+# Two were dropped by Fedora rather than never packaged: gron was orphaned (last
+# shipped F41/42) and sd was retired after F41 (rust-sd's `sd` subpackage, last
+# built 1.0.0-4.fc41), so `dnf install gron` / `dnf install sd` both fail on a
+# current release — hence the go/cargo fallbacks.
 
 # ── editor + git workflow ─────────────────────────────────────
 neovim
@@ -45,7 +46,7 @@ xclip          # X11 fallback (sessions / SSH X-forward)
 gcc
 gcc-c++        # C++ compiler — Fedora's gcc is C-only; some tree-sitter parsers ship C++ scanners
 make
-cargo          # rust toolchain -> cargo install fallback for yazi/dust/xh
+cargo          # rust toolchain -> cargo install fallback for yazi/dust/xh/sd
 
 # ── Neovim provider deps (fix :checkhealth; use dnf NOT pip — F44 python is PEP668-managed)
 python3-neovim # pynvim — the Python 3 provider module

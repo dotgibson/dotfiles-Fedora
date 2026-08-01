@@ -166,6 +166,13 @@ provision() {
     blib_say "xh (cargo; not in Fedora repos)"
     cargo install --locked xh >/dev/null 2>&1 || true
   fi
+  # sd (sed replacement) was retired from Fedora after F41 — rust-sd's `sd` subpackage
+  # last built 1.0.0-4.fc41, so `dnf install sd` fails on current releases. Same story
+  # as gron below, just Rust instead of Go.
+  if ! command -v sd >/dev/null && command -v cargo >/dev/null; then
+    blib_say "sd (cargo — retired from Fedora repos after F41)"
+    cargo install --locked sd >/dev/null 2>&1 || true
+  fi
   # viddy (watch replacement; Core aliases watch->viddy, HAVE_VIDDY-guarded) is a Rust
   # CLI, not in Fedora repos — build from source via cargo like dust/xh above.
   if ! command -v viddy >/dev/null && command -v cargo >/dev/null; then
