@@ -121,10 +121,16 @@ provision() {
   # set and the whole integration (cached init, Ctrl+E, the daemon config) is silently absent
   # on a freshly bootstrapped box. Link it into the dir Core already prepends rather than
   # teaching the 00 band a new PATH entry.
+  # Best-effort like the installers above: this script runs under `set -euo pipefail`, and a
+  # convenience symlink must not abort a bootstrap because ~/.local/bin is read-only, HOME is
+  # mounted oddly, or something already occupies the target.
   if [[ -x "$HOME/.atuin/bin/atuin" ]] && ! command -v atuin >/dev/null 2>&1; then
-    mkdir -p "$HOME/.local/bin"
-    ln -sf "$HOME/.atuin/bin/atuin" "$HOME/.local/bin/atuin"
-    blib_ok "linked ~/.atuin/bin/atuin -> ~/.local/bin/atuin (so 00-tools.zsh can see it)"
+    if mkdir -p "$HOME/.local/bin" 2>/dev/null &&
+      ln -sf "$HOME/.atuin/bin/atuin" "$HOME/.local/bin/atuin" 2>/dev/null; then
+      blib_ok "linked ~/.atuin/bin/atuin -> ~/.local/bin/atuin (so 00-tools.zsh can see it)"
+    else
+      blib_warn "could not link ~/.atuin/bin/atuin into ~/.local/bin — atuin stays invisible to Core's tool detection; add ~/.atuin/bin to PATH by hand"
+    fi
   fi
 
   # ── atuin daemon: the systemd half of the opt-in (dotfiles-core#335) ─────────
@@ -144,16 +150,20 @@ provision() {
     fi
     if [[ -n "$unit_src" && -f "$unit_src" ]]; then
       blib_say "atuin daemon (systemd user unit)"
-      mkdir -p "${unit_dst%/*}"
-      install -m 0644 "$unit_src" "$unit_dst"
-      systemctl --user daemon-reload >/dev/null 2>&1 || true
-      if systemctl --user enable --now atuin-daemon >/dev/null 2>&1; then
-        blib_ok "atuin-daemon enabled — 'loginctl enable-linger \"\$USER\"' keeps it up outside a login session"
+      # Also best-effort: an unwritable ~/.config or a read-only HOME must not take the whole
+      # bootstrap down over an opt-in daemon. Only enable a unit we actually wrote.
+      if (mkdir -p "${unit_dst%/*}" 2>/dev/null && install -m 0644 "$unit_src" "$unit_dst" 2>/dev/null); then
+        systemctl --user daemon-reload >/dev/null 2>&1 || true
+        if systemctl --user enable --now atuin-daemon >/dev/null 2>&1; then
+          blib_ok "atuin-daemon enabled — 'loginctl enable-linger \"\$USER\"' keeps it up outside a login session"
+        else
+          # Never fatal: 00-tools.zsh probes the socket and forces the daemon off for that
+          # shell when nothing is listening, so a failed enable costs the lock relief, not a
+          # working shell.
+          blib_warn "atuin-daemon not enabled (no user systemd session?) — shells fall back to direct SQLite writes"
+        fi
       else
-        # Never fatal: 00-tools.zsh probes the socket and forces the daemon off for that
-        # shell when nothing is listening, so a failed enable costs the lock relief, not a
-        # working shell.
-        blib_warn "atuin-daemon not enabled (no user systemd session?) — shells fall back to direct SQLite writes"
+        blib_warn "could not install the atuin-daemon unit into ~/.config/systemd/user — skipping; shells fall back to direct SQLite writes"
       fi
     fi
   fi
