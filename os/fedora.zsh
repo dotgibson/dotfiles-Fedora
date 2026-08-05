@@ -13,6 +13,12 @@
 # ── PATH: user-local bins first (Core's `clip` scripts + cargo tools land here)
 [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin${PATH:+:$PATH}"
 [[ -d "$HOME/.cargo/bin" && ":$PATH:" != *":$HOME/.cargo/bin:"* ]] && export PATH="$HOME/.cargo/bin${PATH:+:$PATH}"
+# ~/.atuin/bin: where atuin's own installer puts the binary (bootstrap.sh installs it that
+# way — atuin is not reliably packaged on Fedora). The link bootstrap drops in ~/.local/bin
+# is what Core's 00-tools.zsh actually detects, since THIS file is fragment 80 and tool
+# detection already ran at 00; this entry is the belt-and-braces for a box where the link is
+# missing (hand-installed atuin, or a bootstrap that predates it) so at least the command works.
+[[ -d "$HOME/.atuin/bin" && ":$PATH:" != *":$HOME/.atuin/bin:"* ]] && export PATH="$HOME/.atuin/bin${PATH:+:$PATH}"
 
 # ── Detect WSL once (for the niceties below) ──────────────────────────────────
 _IS_WSL=0
@@ -88,6 +94,28 @@ alias se-status='sestatus 2>/dev/null || echo "SELinux not active (expected on W
 alias se-denials='sudo ausearch -m AVC,USER_AVC -ts recent 2>/dev/null | tail -40'
 se-restore() { sudo restorecon -Rv "${1:?usage: se-restore <path>}"; }
 alias se-why='sudo journalctl -t setroubleshoot --since "10 min ago" 2>/dev/null'
+
+# ── atuin daemon: the opt-in Core ships OFF (dotfiles-core#335) ───────────────
+# Core's atuin/config.toml is vendored identically to eight repos, so the per-machine flip
+# is atuin's own env override, set HERE — never by editing that file. The daemon owns the
+# SQLite writes so shells stop contending for the DB lock.
+#
+# Which launcher we point it at depends on whether this box HAS one. Bootstrap installs a
+# systemd user unit, but WSL only has a user manager when /etc/wsl.conf sets systemd=true
+# (and the distro has been restarted since) — so probe rather than assume, because a daemon
+# enabled with nothing to start it is the one state worth avoiding.
+#
+#   systemd present → the unit owns the lifecycle; enable the daemon and let it connect.
+#   no systemd      → hand the lifecycle to atuin itself (autostart), the same path Alpine
+#                     and macOS take. NOT compatible with systemd_socket, which we do not use.
+#
+# Either way Core's guard (00-tools.zsh) probes the socket once before the first prompt and
+# forces the daemon off for that shell if nothing is listening — so a broken launcher costs
+# the lock relief, never a working shell. `core-doctor` reports the degraded state.
+if [[ -n ${HAVE_ATUIN:-} ]]; then
+  export ATUIN_DAEMON__ENABLED=true
+  [[ -d /run/systemd/system ]] || export ATUIN_DAEMON__AUTOSTART=true
+fi
 
 unset _IS_WSL
 

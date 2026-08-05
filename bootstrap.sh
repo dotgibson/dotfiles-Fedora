@@ -114,6 +114,49 @@ provision() {
     blib_say "atuin (official installer)"
     curl -fsSL https://setup.atuin.sh | sh >/dev/null 2>&1 || true
   fi
+  # atuin's installer hard-codes ~/.atuin/bin (install.sh: ATUIN_BIN="$HOME/.atuin/bin/atuin")
+  # and appends its own init line to ~/.zshrc — but wire_links() below REPLACES that file with
+  # the managed loader, and core/zsh/00-tools.zsh prepends only ~/.local/bin before it probes
+  # for tools. Without this link `atuin` is off PATH in a Core shell, so HAVE_ATUIN never gets
+  # set and the whole integration (cached init, Ctrl+E, the daemon config) is silently absent
+  # on a freshly bootstrapped box. Link it into the dir Core already prepends rather than
+  # teaching the 00 band a new PATH entry.
+  if [[ -x "$HOME/.atuin/bin/atuin" ]] && ! command -v atuin >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$HOME/.atuin/bin/atuin" "$HOME/.local/bin/atuin"
+    blib_ok "linked ~/.atuin/bin/atuin -> ~/.local/bin/atuin (so 00-tools.zsh can see it)"
+  fi
+
+  # ── atuin daemon: the systemd half of the opt-in (dotfiles-core#335) ─────────
+  # Core ships atuin/config.toml with [daemon] OFF and the unit as an EXAMPLE, because the
+  # launcher is OS-native. This is Fedora's: install the user unit and enable it. Guarded on
+  # a real user manager — on WSL without `systemd=true` in /etc/wsl.conf there is none, and
+  # os/fedora.zsh falls back to atuin's own autostart there instead.
+  if command -v atuin >/dev/null 2>&1 && [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
+    local unit_src="$DOTFILES/core/examples/atuin-daemon.service"
+    local unit_dst="$HOME/.config/systemd/user/atuin-daemon.service"
+    # Capability probe, not a version parse: an atuin too old to know `daemon` would let the
+    # unit start and fail on repeat, and the unit is Restart=on-failure/RestartSec=3 — i.e. a
+    # restart loop for as long as the box is up. Ask the binary instead of trusting a number.
+    if ! atuin daemon --help >/dev/null 2>&1; then
+      blib_warn "installed atuin has no 'daemon' subcommand (too old) — skipping the unit; upgrade atuin to use daemon mode"
+      unit_src=""
+    fi
+    if [[ -n "$unit_src" && -f "$unit_src" ]]; then
+      blib_say "atuin daemon (systemd user unit)"
+      mkdir -p "${unit_dst%/*}"
+      install -m 0644 "$unit_src" "$unit_dst"
+      systemctl --user daemon-reload >/dev/null 2>&1 || true
+      if systemctl --user enable --now atuin-daemon >/dev/null 2>&1; then
+        blib_ok "atuin-daemon enabled — 'loginctl enable-linger \"\$USER\"' keeps it up outside a login session"
+      else
+        # Never fatal: 00-tools.zsh probes the socket and forces the daemon off for that
+        # shell when nothing is listening, so a failed enable costs the lock relief, not a
+        # working shell.
+        blib_warn "atuin-daemon not enabled (no user systemd session?) — shells fall back to direct SQLite writes"
+      fi
+    fi
+  fi
   if ! command -v yazi >/dev/null && command -v cargo >/dev/null; then
     blib_say "yazi (cargo)"
     cargo install --locked yazi-fs yazi-cli >/dev/null 2>&1 || true
