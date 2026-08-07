@@ -132,7 +132,8 @@ provision() {
   # with ~/.atuin/bin off PATH and HAVE_ATUIN unset.
   if [[ -x "$HOME/.atuin/bin/atuin" ]] &&
     [[ "$(readlink -f "$HOME/.local/bin/atuin" 2>/dev/null)" != "$(readlink -f "$HOME/.atuin/bin/atuin" 2>/dev/null)" ]]; then
-    # -n so an existing DIRECTORY at the target is replaced rather than followed into.
+    # -n avoids dereferencing a symlink-to-directory destination (so we don't create ~/.local/bin/atuin/atuin).
+    # If a real directory occupies the target path, ln will fail and we warn.
     if mkdir -p "$HOME/.local/bin" 2>/dev/null &&
       ln -sfn "$HOME/.atuin/bin/atuin" "$HOME/.local/bin/atuin" 2>/dev/null; then
       blib_ok "linked ~/.atuin/bin/atuin -> ~/.local/bin/atuin (so 00-tools.zsh can see it)"
