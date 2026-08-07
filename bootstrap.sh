@@ -124,9 +124,18 @@ provision() {
   # Best-effort like the installers above: this script runs under `set -euo pipefail`, and a
   # convenience symlink must not abort a bootstrap because ~/.local/bin is read-only, HOME is
   # mounted oddly, or something already occupies the target.
-  if [[ -x "$HOME/.atuin/bin/atuin" ]] && ! command -v atuin >/dev/null 2>&1; then
+  # Gate on the DESTINATION, never on `command -v atuin`. That probe reads the PATH of the
+  # bash running THIS script, not the PATH a Core zsh will build — and atuin's installer
+  # appends `. ~/.atuin/bin/env` to ~/.bashrc, so bootstrapping from a bash that has already
+  # sourced it makes the probe succeed and silently skips the very link this block exists to
+  # create. The failure is invisible until a login zsh (which never reads ~/.bashrc) starts
+  # with ~/.atuin/bin off PATH and HAVE_ATUIN unset.
+  if [[ -x "$HOME/.atuin/bin/atuin" ]] &&
+    [[ "$(readlink -f "$HOME/.local/bin/atuin" 2>/dev/null)" != "$(readlink -f "$HOME/.atuin/bin/atuin" 2>/dev/null)" ]]; then
+    # -n avoids dereferencing a symlink-to-directory destination (so we don't create ~/.local/bin/atuin/atuin).
+    # If a real directory occupies the target path, ln will fail and we warn.
     if mkdir -p "$HOME/.local/bin" 2>/dev/null &&
-      ln -sf "$HOME/.atuin/bin/atuin" "$HOME/.local/bin/atuin" 2>/dev/null; then
+      ln -sfn "$HOME/.atuin/bin/atuin" "$HOME/.local/bin/atuin" 2>/dev/null; then
       blib_ok "linked ~/.atuin/bin/atuin -> ~/.local/bin/atuin (so 00-tools.zsh can see it)"
     else
       blib_warn "could not link ~/.atuin/bin/atuin into ~/.local/bin — atuin stays invisible to Core's tool detection; add ~/.atuin/bin to PATH by hand"
@@ -242,8 +251,14 @@ provision() {
   # op — 1Password CLI, via 1Password's official signed dnf repo.
   if ! command -v op >/dev/null; then
     blib_say "op (1Password CLI — official repo)"
-    sudo rpm --import https://downloads.1password.com/linux/keys/1password.asc >/dev/null 2>&1 || true
-    sudo sh -c 'cat >/etc/yum.repos.d/1password.repo' <<'REPO' 2>/dev/null || true
+    # The repo file sets repo_gpgcheck=1, so it is only usable once the signing key is in the
+    # rpm keyring. Writing it after a FAILED import (the old `|| true`) leaves a repo that is
+    # enabled but unverifiable, and every later dnf transaction — including ones that have
+    # nothing to do with op — errors with "repomd.xml GPG signature verification error:
+    # Signing key not found". Gate the repo file on the import so a transient network failure
+    # costs us op, not the package manager.
+    if sudo rpm --import https://downloads.1password.com/linux/keys/1password.asc >/dev/null 2>&1; then
+      sudo sh -c 'cat >/etc/yum.repos.d/1password.repo' <<'REPO' 2>/dev/null || true
 [1password]
 name=1Password Stable Channel
 baseurl=https://downloads.1password.com/linux/rpm/stable/$basearch
@@ -252,8 +267,11 @@ gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://downloads.1password.com/linux/keys/1password.asc
 REPO
-    sudo dnf -y install 1password-cli >/dev/null 2>&1 ||
-      echo "   op install failed; see developer.1password.com/docs/cli/get-started"
+      sudo dnf -y install 1password-cli >/dev/null 2>&1 ||
+        echo "   op install failed; see developer.1password.com/docs/cli/get-started"
+    else
+      blib_warn "could not import 1Password's signing key — skipping the repo (it would break every later dnf transaction); see developer.1password.com/docs/cli/get-started"
+    fi
   fi
 
   # ── WSL: install /etc/wsl.conf (systemd + default user + interop) ───────────
