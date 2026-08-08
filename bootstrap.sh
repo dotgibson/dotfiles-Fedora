@@ -241,6 +241,21 @@ provision() {
     blib_say "viddy (cargo — watch replacement; not in Fedora repos)"
     cargo install --locked viddy >/dev/null 2>&1 || true
   fi
+  # tealdeer + procs are still in install/packages.txt and still install cleanly on
+  # F43/F44, but both went orphan and neither was rebuilt for rawhide/F45 — the same
+  # orphan→dropped path sd already finished. These two blocks are what makes that
+  # transition a non-event: on F43/F44 dnf supplies the binary and the presence guard
+  # skips the build; from F45 on, `--skip-unavailable` drops the name from the dnf
+  # transaction and cargo picks it up here. Note the tealdeer guard probes `tldr` —
+  # that's the binary the crate installs, `tealdeer` is only the package name.
+  if ! command -v tldr >/dev/null && command -v cargo >/dev/null; then
+    blib_say "tealdeer (cargo — orphaned; last Fedora build F44)"
+    cargo install --locked tealdeer >/dev/null 2>&1 || true
+  fi
+  if ! command -v procs >/dev/null && command -v cargo >/dev/null; then
+    blib_say "procs (cargo — orphaned; last Fedora build F44)"
+    cargo install --locked procs >/dev/null 2>&1 || true
+  fi
   blib_say "doggo / carapace / sesh / gron (go install where absent)"
   _dotfiles_go_install github.com/mr-karan/doggo/cmd/doggo@latest doggo
   _dotfiles_go_install github.com/carapace-sh/carapace-bin/cmd/carapace@latest carapace

@@ -16,11 +16,14 @@ zoxide         # cd
 fzf            # fuzzy finder
 git-delta      # git pager / diffs
 btop           # top/htop
-tealdeer       # tldr (fast Rust client; binary: tldr)
+tealdeer       # tldr (fast Rust client; binary: tldr) — ORPHANED, last built F44; no
+               # rawhide/F45 build. Kept here for F43/F44; bootstrap.sh cargo-installs
+               # it wherever dnf no longer resolves the name.
 
 # ── modern CLI extras (core-doctor probes these; all in Fedora repos) ─
 duf            # df   (disk usage/free)
-procs          # ps
+procs          # ps — ORPHANED, last built F44; no rawhide/F45 build. Same deal as
+               # tealdeer above: kept for F43/F44, cargo fallback covers F45+.
 yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (python-yq is the separate Python tool)
 glow           # markdown viewer
 gum            # shell-script UI toolkit (charm)
@@ -30,6 +33,12 @@ gum            # shell-script UI toolkit (charm)
 # shipped F41/42) and sd was retired after F41 (rust-sd's `sd` subpackage, last
 # built 1.0.0-4.fc41), so `dnf install gron` / `dnf install sd` both fail on a
 # current release — hence the go/cargo fallbacks.
+# tealdeer and procs are mid-way down that same road: both went orphan and neither
+# was rebuilt for rawhide/F45, but both still install on F43/F44. They therefore stay
+# ACTIVE in this list (removing them would swap a fast RPM for a slow source build on
+# every currently-supported release) and bootstrap.sh carries presence-guarded cargo
+# fallbacks for them. The dnf install uses --skip-unavailable, so once F45 drops the
+# names the transaction skips them instead of failing.
 
 # ── editor + git workflow ─────────────────────────────────────
 neovim
@@ -47,14 +56,17 @@ gcc
 gcc-c++        # C++ compiler — Fedora's gcc is C-only; some tree-sitter parsers ship C++ scanners
 make
 cargo          # rust toolchain -> backstops every `cargo install` in bootstrap.sh
-               # (currently yazi, dust, xh, viddy, sd, and tree-sitter-cli if the
-               # packaged one is too old). Don't drop it: that list only grows as
+               # (currently yazi, dust, xh, viddy, sd, tealdeer, procs, and
+               # tree-sitter-cli if the packaged one is too old). Don't drop it: that
+               # list only grows as
                # Fedora retires Rust CLIs — keep this generic rather than enumerated.
 
 # ── Neovim provider deps (fix :checkhealth; use dnf NOT pip — F44 python is PEP668-managed)
 python3-neovim # pynvim — the Python 3 provider module
 python3-pip    # pip for the system python
 tree-sitter-cli # nvim-treesitter (main branch) compiles parsers locally — needs the CLI ≥0.26.1.
+                # F44 and rawhide ship 0.26.11 and clear that floor; F43 ships 0.25.10 and does
+                # NOT — on F43 the packaged CLI is too old for the main branch.
                 # If :checkhealth nvim-treesitter flags it as too old, drop it from this list and
                 # install current via mise (`mise use -g tree-sitter`) or `cargo install tree-sitter-cli`.
 # rust-analyzer  # uncomment if you use the Rust LSP (rustaceanvim wants it)
