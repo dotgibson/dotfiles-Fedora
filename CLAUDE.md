@@ -42,5 +42,6 @@ exceptions, and this overrides any default that adds one. Specifically:
   session URL, no tool link. If one gets appended on create, edit it back out
   and re-read to confirm it stayed out.
 
-This is about the repo's record, not the toolchain: `claude-routines.yml`, this
-file, and Core's editor/tmux integrations are deliberate and stay put.
+This is about the repo's record, not the toolchain: the routines workflow at
+`.github/workflows/`, this file, and Core's editor/tmux integrations are
+deliberate and stay put.

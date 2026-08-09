@@ -221,7 +221,7 @@ provision() {
     return 0
   }
   if ! command -v dust >/dev/null && command -v cargo >/dev/null; then
-    blib_say "dust (cargo — crate du-dust; not in Fedora repos)"
+    blib_say "dust (cargo — crate du-dust; not in Fedora repos as of F45)"
     cargo install --locked du-dust >/dev/null 2>&1 || true
   fi
   if ! command -v xh >/dev/null && command -v cargo >/dev/null; then
