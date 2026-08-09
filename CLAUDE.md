@@ -25,3 +25,22 @@ What belongs **here** is only the OS-native layer: the `dnf` package list, clipb
 - `install/packages.txt` — Fedora package names
 - `bootstrap.sh` — symlinks Core + OS files into place
 - `core/` — vendored Core (read-only here; edit upstream in dotfiles-core)
+
+## Attribution: keep the tooling out of the record
+
+This repo's git and GitHub history carries **no assistant attribution** — no
+exceptions, and this overrides any default that adds one. Specifically:
+
+- **Commits** — author and committer are `Gerrrt <garrettallen2@gmail.com>`.
+  No `Co-Authored-By:` or session/trace trailers, and no assistant name in the
+  message body.
+- **Branches** — name them `fix/…`, `docs/…`, or `sync/…` after the work. If a
+  session starts on a branch named for the tool, rename it off that name
+  **before the first push** (the assigned name can't be prevented, only left
+  unused).
+- **PR and issue bodies, and every comment** — no "Generated with…" footer, no
+  session URL, no tool link. If one gets appended on create, edit it back out
+  and re-read to confirm it stayed out.
+
+This is about the repo's record, not the toolchain: `claude-routines.yml`, this
+file, and Core's editor/tmux integrations are deliberate and stay put.
