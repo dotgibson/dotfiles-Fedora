@@ -5,11 +5,12 @@
 #   starship, yazi — genuinely absent from every current Fedora release; the
 #     upstream installer (starship) / cargo (yazi) is the only automatic path.
 #   atuin — IS packaged now (F43/F44/rawhide all carry 18.12.1), but Fedora trails
-#     upstream 18.19.0, and 18.19.0 is the exact client core/PORTING-MATRIX.md fn²⁰
-#     validated the daemon config-precedence behavior against. Taking the RPM would
-#     swap a known-good atuin for an unvalidated one, so the upstream installer stays.
-#     Revisit when Fedora catches up: bootstrap.sh's three atuin blocks are all
-#     presence-guarded, so adding the name here is the only edit it would take.
+#     upstream 18.19.0, and 18.19.0 is the exact client core/PORTING-MATRIX.md's
+#     atuin²⁰ note validated the daemon config-precedence behavior against. Taking
+#     the RPM would swap a known-good atuin for an unvalidated one, so the upstream
+#     installer stays. Revisit when Fedora catches up: bootstrap.sh's three atuin
+#     blocks are all presence-guarded, so adding the name here is the only edit
+#     it would take.
 
 # ── shell + multiplexer ───────────────────────────────────────
 zsh
