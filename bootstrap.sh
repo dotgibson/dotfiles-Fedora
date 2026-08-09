@@ -196,10 +196,10 @@ provision() {
       echo "   lazygit COPR install failed; do it later: sudo dnf copr enable atim/lazygit && sudo dnf install lazygit"
   fi
 
-  # ── doctor-probed tools not (reliably) in Fedora 41/42 repos ────────────────
+  # ── doctor-probed tools not (reliably) in Fedora repos ─────────────────────
   # Round out core-doctor's modern-CLI set. All best-effort (|| true) + presence-
   # guarded — same discipline as starship/atuin/yazi above; a failure here never
-  # aborts bootstrap. dust/xh via cargo (dust lands in the F43 repo — revisit then);
+  # aborts bootstrap. dust/xh via cargo (neither is packaged as of F45);
   # doggo/carapace/sesh via go install (using an ephemeral mise-provided go when the
   # toolchain isn't already present); op via 1Password's official dnf repo.
   # GOBIN → ~/.local/bin so go-installed binaries land on PATH (the Fedora shell
@@ -221,7 +221,7 @@ provision() {
     return 0
   }
   if ! command -v dust >/dev/null && command -v cargo >/dev/null; then
-    blib_say "dust (cargo — crate du-dust; not in F41/42 repos yet)"
+    blib_say "dust (cargo — crate du-dust; not in Fedora repos)"
     cargo install --locked du-dust >/dev/null 2>&1 || true
   fi
   if ! command -v xh >/dev/null && command -v cargo >/dev/null; then
