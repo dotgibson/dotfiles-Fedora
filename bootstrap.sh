@@ -176,13 +176,18 @@ provision() {
       fi
     fi
   fi
-  # yazi-fm, NOT yazi-fs. yazi-fs is a LIBRARY crate (no [[bin]], no src/main.rs) — the
-  # `yazi` binary this block guards on only ever comes from yazi-fm ([[bin]] name = "yazi"),
-  # and yazi-cli supplies `ya`. Asking for yazi-fs meant the guard could never be satisfied,
-  # so every single bootstrap re-ran a full yazi-workspace build (a hundred-plus crates, tens
-  # of minutes) and threw the result away — silently, since the old call was
-  # `>/dev/null 2>&1`. That is indistinguishable from a hang, and it is why `./bootstrap.sh`
-  # "never completed" here.
+  # `yazi-build` is the ONLY crate that installs yazi from crates.io. This block previously
+  # asked for `yazi-fs`, which is a library crate (no [[bin]]) and can never produce the
+  # `yazi` binary the guard tests for — so the guard was permanently false and every single
+  # bootstrap rebuilt the whole yazi workspace (a hundred-plus crates, many minutes) only to
+  # discard it. Under the old `>/dev/null 2>&1` that is indistinguishable from a hang, and it
+  # is why `./bootstrap.sh` "never completed" here.
+  #
+  # `yazi-fm` (which does declare [[bin]] name = "yazi") is NOT the fix either — verified by
+  # building it: yazi-cli's build.rs panics on purpose with "Due to Cargo's limitations, the
+  # `yazi-fm` and `yazi-cli` crates on crates.io must be built with
+  # `cargo install --force yazi-build`". --force is upstream's own instruction, and harmless
+  # here because the guard above already skips the block once `yazi` exists.
   #
   # Note ux_spin does its own output handling (it captures the build log and replays it only
   # on failure), so it must NOT be wrapped in >/dev/null 2>&1 — that would silence the
@@ -190,7 +195,7 @@ provision() {
   # call below.
   if ! command -v yazi >/dev/null && command -v cargo >/dev/null; then
     ux_spin "yazi (cargo — builds from source)" \
-      cargo install --locked yazi-fm yazi-cli || true
+      cargo install --force --locked yazi-build || true
   fi
   # mise — polyglot runtime manager (node/python/go/...). Portable; activated in
   # core/zsh/00-tools.zsh. Install the binary here; runtimes are fetched separately
