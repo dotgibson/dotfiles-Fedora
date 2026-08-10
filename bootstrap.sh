@@ -176,9 +176,21 @@ provision() {
       fi
     fi
   fi
+  # yazi-fm, NOT yazi-fs. yazi-fs is a LIBRARY crate (no [[bin]], no src/main.rs) — the
+  # `yazi` binary this block guards on only ever comes from yazi-fm ([[bin]] name = "yazi"),
+  # and yazi-cli supplies `ya`. Asking for yazi-fs meant the guard could never be satisfied,
+  # so every single bootstrap re-ran a full yazi-workspace build (a hundred-plus crates, tens
+  # of minutes) and threw the result away — silently, since the old call was
+  # `>/dev/null 2>&1`. That is indistinguishable from a hang, and it is why `./bootstrap.sh`
+  # "never completed" here.
+  #
+  # Note ux_spin does its own output handling (it captures the build log and replays it only
+  # on failure), so it must NOT be wrapped in >/dev/null 2>&1 — that would silence the
+  # spinner itself and discard the log that explains a failed build. Same for every ux_spin
+  # call below.
   if ! command -v yazi >/dev/null && command -v cargo >/dev/null; then
-    blib_say "yazi (cargo)"
-    cargo install --locked yazi-fs yazi-cli >/dev/null 2>&1 || true
+    ux_spin "yazi (cargo — builds from source)" \
+      cargo install --locked yazi-fm yazi-cli || true
   fi
   # mise — polyglot runtime manager (node/python/go/...). Portable; activated in
   # core/zsh/00-tools.zsh. Install the binary here; runtimes are fetched separately
@@ -210,36 +222,41 @@ provision() {
     local gobin="$HOME/.local/bin"
     mkdir -p "$gobin" 2>/dev/null || true
     if command -v go >/dev/null 2>&1; then
-      GOBIN="$gobin" go install "$1" >/dev/null 2>&1 ||
+      GOBIN="$gobin" ux_spin "$2 (go install)" go install "$1" ||
         echo "   $2: go install failed — retry later: GOBIN=$gobin go install $1"
     elif command -v mise >/dev/null 2>&1; then
-      GOBIN="$gobin" mise exec go@latest -- go install "$1" >/dev/null 2>&1 ||
+      # `mise exec go@latest` may first DOWNLOAD an entire Go toolchain, so this is the
+      # slowest arm of the three and the one that most needs a visible elapsed time.
+      GOBIN="$gobin" ux_spin "$2 (go install via mise)" mise exec go@latest -- go install "$1" ||
         echo "   $2: go install failed — retry later: GOBIN=$gobin go install $1"
     else
       echo "   $2: needs Go — install later with: GOBIN=$gobin go install $1"
     fi
     return 0
   }
+  # Each of these is a from-source Rust build costing minutes. Run them under ux_spin (which
+  # keeps a live elapsed-time readout and replays the log only on failure) instead of
+  # >/dev/null 2>&1, so a slow build reads as progress rather than as a wedged script.
   if ! command -v dust >/dev/null && command -v cargo >/dev/null; then
-    blib_say "dust (cargo — crate du-dust; not in Fedora repos as of F45)"
-    cargo install --locked du-dust >/dev/null 2>&1 || true
+    ux_spin "dust (cargo — crate du-dust; not in Fedora repos as of F45)" \
+      cargo install --locked du-dust || true
   fi
   if ! command -v xh >/dev/null && command -v cargo >/dev/null; then
-    blib_say "xh (cargo; not in Fedora repos)"
-    cargo install --locked xh >/dev/null 2>&1 || true
+    ux_spin "xh (cargo; not in Fedora repos)" \
+      cargo install --locked xh || true
   fi
   # sd (sed replacement) was retired from Fedora after F41 — rust-sd's `sd` subpackage
   # last built 1.0.0-4.fc41, so `dnf install sd` fails on current releases. Same story
   # as gron below, just Rust instead of Go.
   if ! command -v sd >/dev/null && command -v cargo >/dev/null; then
-    blib_say "sd (cargo — retired from Fedora repos after F41)"
-    cargo install --locked sd >/dev/null 2>&1 || true
+    ux_spin "sd (cargo — retired from Fedora repos after F41)" \
+      cargo install --locked sd || true
   fi
   # viddy (watch replacement; Core aliases watch->viddy, HAVE_VIDDY-guarded) is a Rust
   # CLI, not in Fedora repos — build from source via cargo like dust/xh above.
   if ! command -v viddy >/dev/null && command -v cargo >/dev/null; then
-    blib_say "viddy (cargo — watch replacement; not in Fedora repos)"
-    cargo install --locked viddy >/dev/null 2>&1 || true
+    ux_spin "viddy (cargo — watch replacement; not in Fedora repos)" \
+      cargo install --locked viddy || true
   fi
   # tealdeer + procs are still in install/packages.txt and still install cleanly on
   # F43/F44, but both went orphan and neither was rebuilt for rawhide/F45 — the same
@@ -249,12 +266,12 @@ provision() {
   # transaction and cargo picks it up here. Note the tealdeer guard probes `tldr` —
   # that's the binary the crate installs, `tealdeer` is only the package name.
   if ! command -v tldr >/dev/null && command -v cargo >/dev/null; then
-    blib_say "tealdeer (cargo — orphaned; last Fedora build F44)"
-    cargo install --locked tealdeer >/dev/null 2>&1 || true
+    ux_spin "tealdeer (cargo — orphaned; last Fedora build F44)" \
+      cargo install --locked tealdeer || true
   fi
   if ! command -v procs >/dev/null && command -v cargo >/dev/null; then
-    blib_say "procs (cargo — orphaned; last Fedora build F44)"
-    cargo install --locked procs >/dev/null 2>&1 || true
+    ux_spin "procs (cargo — orphaned; last Fedora build F44)" \
+      cargo install --locked procs || true
   fi
   blib_say "doggo / carapace / sesh / gron (go install where absent)"
   _dotfiles_go_install github.com/mr-karan/doggo/cmd/doggo@latest doggo
@@ -266,8 +283,27 @@ provision() {
   # op — 1Password CLI, via 1Password's official signed dnf repo.
   if ! command -v op >/dev/null; then
     blib_say "op (1Password CLI — official repo)"
-    # The repo file sets repo_gpgcheck=1, so it is only usable once the signing key is in the
-    # rpm keyring. Writing it after a FAILED import (the old `|| true`) leaves a repo that is
+    # This repo needs the signing key in TWO places, and they are not the same place.
+    #
+    #   gpgcheck=1      → PACKAGE signatures, checked against the rpm keyring
+    #                     (`rpm --import`, below). Global, one copy, root-owned.
+    #   repo_gpgcheck=1 → REPOSITORY METADATA signatures, which dnf5 checks against a
+    #                     PER-REPO, PER-USER keyring at <cachedir>/<repo>/pubring —
+    #                     /var/cache/libdnf5/... for root, ~/.cache/libdnf5/... for you.
+    #
+    # Seeding only the rpm keyring is what broke this box: root's dnf picked the key up on
+    # its first transaction, the invoking user's never did, and so every NON-ROOT
+    # `dnf --refresh` stopped to ask permission to import it. Those callers (`up`'s
+    # post-upgrade refresh, the maintenance runner's upgradable count, the shell nudge) all
+    # capture stdout and discard stderr, so the question was invisible — and because a
+    # declined import is never persisted, it came back every single time. `up` and
+    # `maint-run` both hung forever with no output.
+    #
+    # So: import to the rpm keyring, then warm the USER's dnf cache too. -y accepts the
+    # key non-interactively and </dev/null guarantees this can never be the thing that
+    # blocks a bootstrap, belt and braces.
+    #
+    # Writing the repo file after a FAILED import (the old `|| true`) leaves a repo that is
     # enabled but unverifiable, and every later dnf transaction — including ones that have
     # nothing to do with op — errors with "repomd.xml GPG signature verification error:
     # Signing key not found". Gate the repo file on the import so a transient network failure
@@ -287,6 +323,15 @@ REPO
     else
       blib_warn "could not import 1Password's signing key — skipping the repo (it would break every later dnf transaction); see developer.1password.com/docs/cli/get-started"
     fi
+  fi
+  # Warm the INVOKING USER's dnf keyring (no sudo — that is the entire point; see the
+  # two-keyrings note above). Deliberately OUTSIDE the `command -v op` guard: the boxes that
+  # need this most are the ones where op installed fine and only root ever got the key, so
+  # gating it on a missing op would skip exactly the machines that are already broken.
+  # Idempotent and cheap once the cache is warm, so it is safe on every run.
+  if [[ -f /etc/yum.repos.d/1password.repo ]] && command -v dnf >/dev/null; then
+    dnf -y makecache --repo=1password </dev/null >/dev/null 2>&1 ||
+      blib_warn "could not warm the user dnf cache for the 1Password repo — if \`up\` or \`maint-run\` ever appear to hang, run: dnf -y --refresh makecache --repo=1password"
   fi
 
   # ── WSL: install /etc/wsl.conf (systemd + default user + interop) ───────────
