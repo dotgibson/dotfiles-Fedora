@@ -299,10 +299,10 @@ provision() {
   # ux_spin it failed invisibly — `>/dev/null 2>&1` swallowed the explanation and the run just
   # never produced a `carapace`.
   #
-  # Upstream publishes a signed-by-nobody-but-official .rpm per release, which is the native
-  # answer here and lands in /usr/bin, so `dnf upgrade` (and `up`) maintain it from then on
-  # instead of it drifting as an unmanaged ~/.local/bin binary. Resolve the newest asset for
-  # THIS arch with grep/cut (no jq dependency) rather than pinning a version that would rot.
+  # Upstream publishes an official .rpm per release, which lands in /usr/bin.
+  # Note: installing from a release URL does NOT add an upgrade source, so `dnf upgrade` won't
+  # update it automatically; rerun bootstrap (or reinstall from the latest RPM) to pick up new versions.
+  # Resolve the newest asset for THIS arch with grep/cut (no jq dependency) rather than pinning a version that would rot.
   if ! command -v carapace >/dev/null; then
     blib_say "carapace (upstream RPM — go install is impossible, see above)"
     local _cara_arch=""
