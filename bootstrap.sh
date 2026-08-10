@@ -278,13 +278,63 @@ provision() {
     ux_spin "procs (cargo — orphaned; last Fedora build F44)" \
       cargo install --locked procs || true
   fi
-  blib_say "doggo / carapace / sesh / gron (go install where absent)"
+  blib_say "doggo / sesh / gron (go install where absent)"
   _dotfiles_go_install github.com/mr-karan/doggo/cmd/doggo@latest doggo
-  _dotfiles_go_install github.com/carapace-sh/carapace-bin/cmd/carapace@latest carapace
   _dotfiles_go_install github.com/joshmedeski/sesh/v2@latest sesh
   # gron was orphaned + dropped from Fedora (last in F41/42), so `dnf install gron`
   # fails on current releases — install it from source like the others above.
   _dotfiles_go_install github.com/tomnomnom/gron@latest gron
+
+  # carapace: upstream's official RPM, NOT `go install`.
+  #
+  # `go install github.com/carapace-sh/carapace-bin/cmd/carapace@latest` cannot ever work,
+  # and this is a permanent property of the module rather than a transient break. Its go.mod
+  # carries two `replace` directives (spf13/pflag → carapace-pflag, kevinburke/ssh_config →
+  # carapace-sh/ssh_config), and `go install pkg@version` refuses any module that does,
+  # because a replace would make the build differ from building it as the main module:
+  #   "The go.mod file for the module providing named packages contains one or more replace
+  #    directives. It must not contain directives that would cause it to be interpreted
+  #    differently than if it were the main module."
+  # The old call therefore failed on EVERY bootstrap, and until the cargo/go steps moved onto
+  # ux_spin it failed invisibly — `>/dev/null 2>&1` swallowed the explanation and the run just
+  # never produced a `carapace`.
+  #
+  # Upstream publishes an official .rpm per release, which lands in /usr/bin. Be exact about
+  # what that does and does not buy, because an earlier revision of this comment claimed the
+  # opposite: installing from a release URL does NOT add a repo, so NOTHING upgrades carapace
+  # afterwards. Not `dnf upgrade`, not `up`, and not a later bootstrap either — the
+  # `command -v carapace` guard below skips the whole block once the binary exists. Upstream
+  # ships no yum/dnf repo and Fedora does not package it, so there is no upgrade source to
+  # point at; updating is a deliberate manual step, and `carapace --version` is how you'd know
+  # you are behind:
+  #   sudo dnf -y install "$(curl -fsSL https://api.github.com/repos/carapace-sh/carapace-bin/releases/latest \
+  #     | grep -o '"browser_download_url": *"[^"]*linux_amd64\.rpm"' | cut -d'"' -f4 | head -1)"
+  # That is the real cost of this route. It is still the right one: `go install` cannot work
+  # at all (see above), so the choice is a manually-updated binary or no carapace.
+  # Resolve the newest asset for THIS arch with grep/cut (no jq dependency) rather than pinning a version that would rot.
+  if ! command -v carapace >/dev/null; then
+    blib_say "carapace (upstream RPM — go install is impossible, see above)"
+    local _cara_arch=""
+    case "$(uname -m)" in
+    x86_64) _cara_arch=amd64 ;;
+    aarch64) _cara_arch=arm64 ;;
+    esac
+    if [[ -z "$_cara_arch" ]]; then
+      blib_warn "carapace: no upstream RPM for $(uname -m) — skipping; see github.com/carapace-sh/carapace-bin/releases"
+    else
+      local _cara_url=""
+      _cara_url="$(curl -fsSL --max-time 30 \
+        https://api.github.com/repos/carapace-sh/carapace-bin/releases/latest 2>/dev/null |
+        grep -o "\"browser_download_url\": *\"[^\"]*linux_${_cara_arch}\.rpm\"" |
+        cut -d'"' -f4 | head -1)" || true
+      if [[ -n "$_cara_url" ]]; then
+        sudo dnf -y install "$_cara_url" >/dev/null 2>&1 ||
+          blib_warn "carapace: RPM install failed — retry later: sudo dnf install $_cara_url"
+      else
+        blib_warn "carapace: could not resolve the latest linux_${_cara_arch} RPM (offline? API rate-limited?) — see github.com/carapace-sh/carapace-bin/releases"
+      fi
+    fi
+  fi
   # op — 1Password CLI, via 1Password's official signed dnf repo.
   if ! command -v op >/dev/null; then
     blib_say "op (1Password CLI — official repo)"
