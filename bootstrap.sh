@@ -299,9 +299,18 @@ provision() {
   # ux_spin it failed invisibly — `>/dev/null 2>&1` swallowed the explanation and the run just
   # never produced a `carapace`.
   #
-  # Upstream publishes an official .rpm per release, which lands in /usr/bin.
-  # Note: installing from a release URL does NOT add an upgrade source, so `dnf upgrade` won't
-  # update it automatically; rerun bootstrap (or reinstall from the latest RPM) to pick up new versions.
+  # Upstream publishes an official .rpm per release, which lands in /usr/bin. Be exact about
+  # what that does and does not buy, because an earlier revision of this comment claimed the
+  # opposite: installing from a release URL does NOT add a repo, so NOTHING upgrades carapace
+  # afterwards. Not `dnf upgrade`, not `up`, and not a later bootstrap either — the
+  # `command -v carapace` guard below skips the whole block once the binary exists. Upstream
+  # ships no yum/dnf repo and Fedora does not package it, so there is no upgrade source to
+  # point at; updating is a deliberate manual step, and `carapace --version` is how you'd know
+  # you are behind:
+  #   sudo dnf -y install "$(curl -fsSL https://api.github.com/repos/carapace-sh/carapace-bin/releases/latest \
+  #     | grep -o '"browser_download_url": *"[^"]*linux_amd64\.rpm"' | cut -d'"' -f4 | head -1)"
+  # That is the real cost of this route. It is still the right one: `go install` cannot work
+  # at all (see above), so the choice is a manually-updated binary or no carapace.
   # Resolve the newest asset for THIS arch with grep/cut (no jq dependency) rather than pinning a version that would rot.
   if ! command -v carapace >/dev/null; then
     blib_say "carapace (upstream RPM — go install is impossible, see above)"
