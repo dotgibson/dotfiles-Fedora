@@ -27,7 +27,9 @@ lint: shellcheck syntax zsh-syntax ## The gate: shellcheck + bash -n + zsh -n (w
 	@printf '\033[32m✓\033[0m lint clean\n'
 
 shellcheck: ## ShellCheck the repo-owned bash (excludes the vendored core/)
-	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed: sudo dnf install ShellCheck"; exit 1; }
+	@command -v shellcheck >/dev/null 2>&1 || { \
+	  if [ "$$(id -u 2>/dev/null)" = 0 ]; then p=""; elif command -v sudo >/dev/null 2>&1; then p="sudo "; else p="<as root> "; fi; \
+	  echo "shellcheck not installed: $${p}dnf install ShellCheck"; exit 1; }
 	@test -n "$(SH_FILES)" || { echo "no repo-owned .sh"; exit 0; }
 	@echo "shellcheck -x $(SH_FILES)"
 	@shellcheck -x $(SH_FILES)

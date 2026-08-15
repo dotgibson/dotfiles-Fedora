@@ -153,7 +153,13 @@ if blib_is_wsl; then IS_WSL=1; fi
 # with BLIB_SU= . Resolving here fixes both, and keeps the lib's own escalations
 # (blib_set_login_shell) in step with ours.
 if [[ -z "${BLIB_SU+x}" ]]; then
-  if [[ "$(id -u)" -eq 0 ]]; then
+  # STRING compare, and tolerate `id` itself being unavailable. `[[ "$(id -u)" -eq 0 ]]` is
+  # an ARITHMETIC comparison, and bash evaluates an empty string there as 0 — so on a box
+  # where `id` is missing or off PATH that concluded "we are root" and then ran every
+  # privileged command unescalated. Fail closed to "not root": the worst case is a
+  # needless sudo. (Same fix landed upstream in blib_resolve_su.)
+  _uid="$(id -u 2>/dev/null || true)"
+  if [[ "$_uid" == "0" ]]; then
     BLIB_SU=""
   elif command -v sudo >/dev/null 2>&1; then
     BLIB_SU="sudo"
@@ -311,19 +317,19 @@ provision() {
     }
     if ! curl -fsSL --max-time 60 "$url" -o "$tmp"; then
       rm -f "$tmp"
-      note_fail "$label: download failed (offline?) — retry later: curl -fsSL $url | sh"
+      note_fail "$label: download failed (offline?) — retry later: curl -fsSL $url -o /tmp/$label.sh && sh /tmp/$label.sh"
       return 0
     fi
     # A proxy/captive portal that answers with an HTML error page is still a 200; refuse to
     # execute anything that is not recognisably a shell script.
     if [[ ! -s "$tmp" ]] || ! head -c 200 "$tmp" | grep -qE '^#!|^#'; then
       rm -f "$tmp"
-      note_fail "$label: downloaded installer does not look like a shell script — refusing to run it"
+      note_fail "$label: downloaded installer does not look like a shell script — refusing to run it (captive portal or proxy error page?)"
       return 0
     fi
     sh "$tmp" "$@" >/dev/null || rc=$?
     rm -f "$tmp"
-    ((rc == 0)) || note_fail "$label: installer exited $rc — retry later: curl -fsSL $url | sh"
+    ((rc == 0)) || note_fail "$label: installer exited $rc — retry later: curl -fsSL $url -o /tmp/$label.sh && sh /tmp/$label.sh"
     return 0
   }
 
