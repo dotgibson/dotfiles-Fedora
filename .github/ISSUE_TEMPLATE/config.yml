@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 Documentation
+    url: https://dotgibson.github.io/dotfiles-web/docs/repos/dotfiles-Fedora
+    about: The documentation hub for this layer, including the porting matrix.
+  - name: 🧩 Shared config (zsh, tmux, nvim, git, starship)
+    url: https://github.com/dotgibson/dotfiles-core/issues
+    about: Anything under core/ is vendored from dotfiles-core — please file it there.
+  - name: 🔒 Security issue
+    url: https://github.com/dotgibson/dotfiles-Fedora/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.

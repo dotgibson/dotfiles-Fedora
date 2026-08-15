@@ -1,0 +1,41 @@
+# .editorconfig — house style for dotfiles-Fedora.
+# https://editorconfig.org — honored natively by Neovim (this repo's editor), VS Code,
+# and most others. Kept deliberately in step with core/.editorconfig: this repo is the
+# template the other Linux OS repos are stamped from, so a divergent style here would
+# propagate. It guides EDITORS only; .gitattributes is what enforces LF at the git layer.
+#
+# NB: this applies to the REPO-OWNED files (bootstrap.sh, os/, install/, docs). The
+# vendored core/ carries its own identical copy and is gated upstream.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Shell — 2-space. shfmt is advisory in CI (the lint gate warns, never blocks), because
+# bootstrap.sh uses a deliberate compact one-liner style in its arg loop.
+[*.{sh,zsh}]
+indent_size = 2
+
+[*.{toml,yml,yaml}]
+indent_size = 2
+
+# Markdown: trailing whitespace can be a meaningful hard line break.
+[*.md]
+trim_trailing_whitespace = false
+
+# tmux/git overlays follow upstream conventions.
+[*.{conf,gitconfig}]
+indent_size = 2
+
+# The package list is data: one name per line, comments aligned by hand.
+[install/packages.txt]
+trim_trailing_whitespace = false
+
+# Makefile — recipe lines REQUIRE real tabs; override the global space rule.
+[Makefile]
+indent_style = tab
