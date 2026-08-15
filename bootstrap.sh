@@ -180,11 +180,10 @@ priv() {
 # cryptic error from whichever one happened to be reached first.
 preflight_cmds() {
   local -a need=() missing=()
-  if ((LINKS_ONLY)); then
-    need=(git) # only the tpm clone in blib_link_core
-  else
-    need=(dnf rpm curl sed awk git)
-  fi
+  # --links-only has NO hard requirements: wiring is pure shell plus coreutils. Notably it
+  # must not demand git — the reusable CI test provisions only `bash zsh` and pre-seeds the
+  # tpm dir precisely so the wiring path stays offline and deterministic.
+  ((LINKS_ONLY)) || need=(dnf rpm curl sed awk)
   local c
   for c in "${need[@]}"; do
     command -v "$c" >/dev/null 2>&1 || missing+=("$c")
@@ -193,6 +192,12 @@ preflight_cmds() {
     echo "Missing required command(s): ${missing[*]}" >&2
     echo "On Fedora: ${BLIB_SU:+$BLIB_SU }dnf install -y ${missing[*]}" >&2
     exit 1
+  fi
+  # git is a SOFT requirement, and only for the one-time tpm clone in blib_link_core —
+  # which already degrades gracefully on failure. On a full run dnf installs git from
+  # install/packages.txt anyway, well before the wiring step. So warn, never abort.
+  if ! command -v git >/dev/null 2>&1 && [[ ! -d "$CONFIG/tmux/plugins/tpm" ]]; then
+    blib_warn "git is not installed — the one-time tpm clone will be skipped; install git, then re-run with --links-only (or clone tpm by hand and press prefix + I)"
   fi
 }
 preflight_cmds
