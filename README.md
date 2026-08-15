@@ -115,8 +115,27 @@ exec zsh
 
 `core/` is a vendored subtree and is **already present** in a clone — there is no
 submodule step. `bootstrap.sh` is idempotent: it provisions `dnf` packages and
-symlinks Core + the Fedora layer into place. Flags: `--links-only` (re-link
-without touching `dnf`), `--no-flatpak` (skip Flatpak).
+symlinks Core + the Fedora layer into place.
+
+Not sure what it will do to a machine that already has dotfiles? Preview it — this
+changes nothing:
+
+```bash
+./bootstrap.sh --dry-run
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--dry-run` | Print the full plan (packages *and* symlinks); mutate nothing |
+| `--links-only` | Re-link only — no `dnf`, no downloads |
+| `--no-flatpak` | Skip Flathub (recommended on WSL) |
+| `--only` / `--skip` | Restrict wiring to module groups: `zsh nvim tmux git prompt tools` |
+| `--strict` | Exit non-zero if any best-effort step failed |
+| `--force-os` | Allow a Fedora-*like* distro (RHEL/Alma/Rocky/Nobara) |
+
+It needs root only to install packages, and resolves that once — running as root
+(a container, a WSL first boot) works with no `sudo` installed at all. Existing files
+are always backed up to `<file>.pre-dotfiles.<epoch>` before being replaced.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -127,8 +146,13 @@ Only what changes with the OS. The heavy lifting — the shell modules, editor, 
 prompt — comes from vendored Core; this repo owns the Fedora specifics:
 
 - `bootstrap.sh` — `dnf` provision + Core/OS symlink wiring (idempotent)
-- `install/packages.txt` — the `dnf` package list (modern CLI stack)
+- `install/packages.txt` — the `dnf` package list (modern CLI stack), verified against
+  every supported Fedora release by the `packages` workflow
 - `os/fedora.zsh` — clipboard + package-manager aliases → `~/.config/zsh/80-os.zsh`
+- `os/fedora.conf` / `os/fedora.gitconfig` — the tmux + git OS overlays
+- `wsl/wsl.conf` — the WSL boot config (systemd, default user, interop)
+- `aliases.md` — the Fedora alias cheat sheet ([`core/aliases.md`](core/aliases.md) covers
+  the universal ones)
 - `core/` — vendored from `dotfiles-core` (read-only here; edit upstream)
 
 The things that actually bite on Fedora — dnf5, RPM Fusion, the Wayland clipboard
@@ -152,6 +176,17 @@ This is an **OS-native layer**, so the contribution rule is a boundary rule:
 3. **Green the lint gate.** This repo's CI runs shellcheck + `bash -n` / `zsh -n`
    on the repo-owned shell (the vendored `core/` is excluded — it is gated
    upstream).
+
+```bash
+make          # list every target
+make lint     # the gate: shellcheck + bash -n + zsh -n, exactly as CI runs it
+make check    # lint + a hermetic --links-only run in a throwaway HOME
+make hooks    # install the pre-commit hooks (shellcheck, markdownlint, gitleaks)
+```
+
+Full details in [`CONTRIBUTING.md`](CONTRIBUTING.md); the trust decisions
+`bootstrap.sh` makes when it reaches outside `dnf` are documented in
+[`SECURITY.md`](SECURITY.md).
 
 Structural changes to the OS-native layout start here and propagate per the
 [porting matrix][porting]. Bugs and ideas: open an
