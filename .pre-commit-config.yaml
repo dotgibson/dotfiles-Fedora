@@ -1,0 +1,70 @@
+# .pre-commit-config.yaml — author-time guardrails for dotfiles-Fedora.
+# Mirrors the CI gate (the reusable lint workflow in dotfiles-core) so drift is caught
+# locally, before it is pushed.
+#
+#   one-time:  pip install pre-commit && make hooks
+#   manual:    pre-commit run --all-files
+#
+# THE VENDORED core/ IS EXCLUDED FROM EVERY HOOK. It is a byte-for-byte subtree copy
+# gated by dotfiles-core's own `make audit`, and — critically — a formatting hook that
+# "fixed" a file in there would change its git tree SHA and fail the core-integrity check.
+# That is why the exclude is global here, unlike Core's own config.
+exclude: '^core/'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$|^install/packages\.txt$'
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml # the six workflow callers
+      - id: check-executables-have-shebangs
+      # The bug class this repo cares about most: bootstrap.sh losing its exec bit, or
+      # gaining a CRLF shebang. Both are valid text, so shellcheck never sees them.
+      - id: check-shebang-scripts-are-executable
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.11.0
+    hooks:
+      - id: shellcheck
+        args: ["-x"] # excludes come from .shellcheckrc, matching CI
+        files: '\.sh$'
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.23.2
+    hooks:
+      - id: markdownlint-cli2
+        # Shares .markdownlint.jsonc with Core (one rule config across the fleet). CI has
+        # no markdown job for OS repos today, so this is the only markdown gate here.
+
+  # Secret scanning at author time. This repo stores no secrets by design (see
+  # SECURITY.md) and it is PUBLIC — gitleaks catches a pasted token in the commit diff
+  # before it can be pushed. GitHub push protection is the server-side backstop.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      # The boundary rule, enforced at commit time. Same check as the core-guard hook
+      # bootstrap.sh installs, but version-controlled and shared with anyone who runs
+      # `make hooks` — .git/hooks is per-machine and does not survive a fresh clone.
+      - id: no-core-edits
+        name: refuse hand-edits to the vendored core/ subtree
+        entry: |
+          bash -c 'if [ -n "${DOTFILES_ALLOW_CORE_EDIT:-}" ]; then exit 0; fi;
+          f=$(git diff --cached --name-only -- core/);
+          if [ -n "$f" ]; then
+            echo "refusing to commit edits to the vendored core/ subtree:" >&2;
+            echo "$f" | sed "s/^/    /" >&2;
+            echo "core/ is overwritten on the next \`make sync\` — fix it upstream in dotfiles-core." >&2;
+            exit 1;
+          fi'
+        language: system
+        pass_filenames: false
+        always_run: true

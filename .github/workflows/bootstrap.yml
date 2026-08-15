@@ -4,12 +4,14 @@
 # the deps bootstrap needs. See dotfiles-core/.github/workflows/bootstrap-test.yml.
 name: bootstrap
 
+# NO path filters, deliberately — `test / lint` and `test / links-only` are REQUIRED
+# status checks on main. A filtered-out required check never reports, so GitHub blocks the
+# PR indefinitely waiting for a result that will never arrive. See the same note in
+# lint.yml. The links-only run is a couple of minutes; the deadlock is forever.
 on:
   pull_request:
-    paths: ['bootstrap.sh', 'core/**', 'os/**', 'ssh/**', '.github/workflows/bootstrap.yml']
   push:
     branches: [main]
-    paths: ['bootstrap.sh', 'core/**', 'os/**', 'ssh/**', '.github/workflows/bootstrap.yml']
   workflow_dispatch:
 
 permissions:

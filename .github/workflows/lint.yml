@@ -5,12 +5,16 @@ name: lint
 # ~200-line copy this file used to carry. The gate's internals (the SHA-256-verified
 # pinned-tool bootstrap, the core/ exclude, shfmt-advisory) live there now. Fedora has no
 # extra excludes (only Kali does), so no `with:` is needed.
+# NO path filters, deliberately. `lint` is a REQUIRED status check on main, and a required
+# check that is filtered out never runs — so it never reports, and GitHub blocks the PR
+# forever waiting for a result that cannot arrive. (The classic symptom: a docs-only PR
+# stuck on "Expected — Waiting for status to be reported".) The gate is only a couple of
+# minutes, so running it on every PR is far cheaper than the deadlock. Same reasoning in
+# bootstrap.yml. If you re-add a filter here, remove this check from the ruleset first.
 on:
   push:
     branches: [main, master]
-    paths-ignore: ["**.md", "LICENSE"]
   pull_request:
-    paths-ignore: ["**.md", "LICENSE"]
 
 concurrency:
   group: lint-${{ github.ref }}

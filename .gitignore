@@ -3,11 +3,35 @@
 *.bak
 *.pre-dotfiles.*
 .DS_Store
-zsh/local.zsh
+# ANCHORED (leading slash) on purpose. An unanchored `.claude/` matches at ANY depth, so it
+# also swallowed core/.claude/ — 14 files that are TRACKED, because they arrive with the
+# vendored subtree. The vendored core/ must byte-match upstream or core-integrity.sh's
+# tree-SHA comparison fails, so a `git subtree pull` that needs to re-add one of those files
+# must never be silently skipped by an ignore rule. Keep every repo-meta pattern rooted.
+/.claude/
+
+# ── secrets: nothing here is ever tracked ─────────────────────────────────────
+# This repo stores NO secrets by design — runtime secrets come from 1Password via
+# `op` (see core/zsh/50-op.zsh). These patterns are the belt-and-braces for the
+# usual accidents: an .env dropped next to the configs, a key pasted into the tree,
+# a credential file written by a tool. See SECURITY.md.
 .env
 .env.*
 !.env.example
-.claude/
+*.pem
+*.key
+!**/*.pub
+id_rsa*
+id_ecdsa*
+id_ed25519*
+*.p12
+*.pfx
+.netrc
+.npmrc
+credentials.json
+# host-local git identity (name/email) is SEEDED to ~/.config/git/local.gitconfig
+# by bootstrap.sh and edited there — it must never be tracked back from this repo.
+local.gitconfig
 
 # private SSH material — track ssh/config only, never keys
 ssh/*

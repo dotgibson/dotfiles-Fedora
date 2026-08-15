@@ -1,0 +1,24 @@
+# .shellcheckrc — repo-wide ShellCheck config so author-time, pre-commit, CI, and the
+# editor (bashls / nvim) all lint identically. Without this, the only settings were the
+# `-x` flag and SHELLCHECK_OPTS that the reusable lint workflow passes — so an editor
+# opening bootstrap.sh saw none of them and could disagree with CI.
+#
+# The excludes below MIRROR the reusable gate in dotfiles-core
+# (.github/workflows/lint-call.yml: SHELLCHECK_OPTS="-e SC1090 -e SC1091 -e SC2015 -e SC2088").
+# Keep them in step: if that list changes upstream, change it here too, or `make lint`
+# and CI will disagree.
+
+# Follow `source`-d files so `-x` resolves core/lib/ux.sh + core/lib/bootstrap-lib.sh
+# from any working directory.
+external-sources=true
+source-path=SCRIPTDIR
+
+# Lint as bash: bootstrap.sh is #!/usr/bin/env bash, and the libs it sources carry no
+# shebang. (zsh has no ShellCheck mode — os/fedora.zsh is checked with `zsh -n` instead.)
+shell=bash
+
+# House-style suppressions, matching the fleet gate:
+#   SC1090/SC1091 — runtime `source` of paths ShellCheck cannot follow statically
+#   SC2015        — the deliberate `cmd && ok || warn` idiom used throughout
+#   SC2088        — tildes inside quoted user-facing MESSAGES (not paths to expand)
+disable=SC1090,SC1091,SC2015,SC2088
