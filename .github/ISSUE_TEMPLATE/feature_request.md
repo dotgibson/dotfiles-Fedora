@@ -1,31 +1,25 @@
 ---
 name: Feature request
-about: Suggest something for the Fedora layer
-title: ''
+about: Propose a new Core file or a change to an existing one
+title: "feat: "
 labels: enhancement
-assignees: ''
 ---
 
-## What & why
+## What do you want to add or change?
 
-<!-- The problem you're trying to solve, not only the solution you have in mind. -->
+A clear description of the proposal.
 
-## Which layer?
+## Is it actually Core?
 
-- [ ] Genuinely **Fedora-specific** (dnf, RPM Fusion, COPR, Flatpak, SELinux, Wayland,
-      WSL interop) — belongs here.
-- [ ] Would be **identical on every distro** — belongs in
-      [dotfiles-core](https://github.com/dotgibson/dotfiles-core/issues).
-- [ ] Changes with the **operator** (offensive/defensive tooling) — belongs in
-      `dotfiles-Kali` / `dotfiles-Defense`.
+Core is the config that is **identical on every machine** and **not** offensive
+tooling. Confirm it passes the three-layer test (see CONTRIBUTING.md):
 
-## If this adds a tool
+- [ ] It is identical on every machine (not OS-specific: no package manager,
+      paths, or clipboard logic).
+- [ ] It is not offensive/engagement tooling (that lives in `dotfiles-Offense`).
+- [ ] If it's a new file, I'll add its path to `core.manifest` (the contract).
 
-- Package name on Fedora (or why it isn't packaged): <!-- `dnf provides` / `dnf search` -->
-- If not packaged, the install route: cargo / go / COPR / upstream RPM / install script
-- Does Core already probe for it (`core-doctor`)?
+## Why
 
-> Anything installed outside `dnf` is a trust decision that gets recorded in
-> [SECURITY.md](../SECURITY.md) — please say which route you'd expect.
-
-## Alternatives considered
+What this enables, or what pain it removes. Since a change here fans out to all
+nine OS repos, note any blast radius worth weighing.
