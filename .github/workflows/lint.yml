@@ -4,7 +4,7 @@ name: lint
 # (.github/workflows/lint-call.yml) — one definition for the whole fleet, replacing the
 # ~200-line copy this file used to carry. The gate's internals (the SHA-256-verified
 # pinned-tool bootstrap, the core/ exclude, shfmt-advisory) live there now. Fedora has no
-# extra excludes (only Kali does), so no `with:` is needed.
+# extra excludes (only Offense does), so no `with:` is needed.
 # NO path filters, deliberately. `lint` is a REQUIRED status check on main, and a required
 # check that is filtered out never runs — so it never reports, and GitHub blocks the PR
 # forever waiting for a result that cannot arrive. (The classic symptom: a docs-only PR

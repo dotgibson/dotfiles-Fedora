@@ -17,7 +17,7 @@ assignees: ''
 - [ ] Would be **identical on every distro** — belongs in
       [dotfiles-core](https://github.com/dotgibson/dotfiles-core/issues).
 - [ ] Changes with the **operator** (offensive/defensive tooling) — belongs in
-      `dotfiles-Kali` / `dotfiles-Defense`.
+      `dotfiles-Offense` / `dotfiles-Defense`.
 
 ## If this adds a tool
 
