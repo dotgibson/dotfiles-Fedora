@@ -31,7 +31,7 @@ Three things enforce this, deliberately overlapping:
 | --- | --- |
 | is identical on every machine (zsh, tmux, nvim, git, starship) | `dotfiles-core` |
 | changes with the **OS** (package manager, clipboard, paths, SELinux) | **here** |
-| changes with the **operator** (offensive/defensive tooling) | `dotfiles-Kali` / `dotfiles-Defense` |
+| changes with the **operator** (offensive/defensive tooling) | `dotfiles-Offense` / `dotfiles-Defense` |
 
 Structural changes to the OS-native layout **start here** and propagate per
 [`core/PORTING-MATRIX.md`](core/PORTING-MATRIX.md). If your fix to `bootstrap.sh` would
