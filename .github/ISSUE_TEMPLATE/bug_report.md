@@ -1,36 +1,40 @@
 ---
 name: Bug report
-about: Something in the Fedora layer is broken
-title: ''
+about: A Core file is broken, behaves wrong, or fails the audit
+title: "bug: "
 labels: bug
-assignees: ''
 ---
 
-## What happened
+<!--
+Reminder: this is the Core layer, vendored into nine OS repos via git subtree.
+If the problem is OS-specific (package manager, paths, clipboard) it belongs in
+the OS repo; if it's offensive/engagement tooling, it belongs in dotfiles-Offense.
+See CONTRIBUTING.md for the three-layer test.
+-->
 
-<!-- Include the actual output. If bootstrap.sh appeared to hang, say where it stopped —
-     the last line it printed is usually the whole diagnosis. -->
+## What's wrong
 
-## What you expected
+A clear description of the bug.
 
-## Reproduce
+## Which Core file(s)
+
+e.g. `zsh/00-tools.zsh`, `scripts/audit-core.sh`, `nvim/lua/gerrrt/...`
+
+## How to reproduce
+
+Steps, or a minimal command. If it's a load-order/runtime break, the output of:
 
 ```bash
-# the exact command
-./bootstrap.sh
+./scripts/audit-core.sh        # the one gate
+./scripts/test-core.sh         # behavioral (load-order + function units)
 ```
+
+## Expected vs actual
+
+What you expected, and what happened instead.
 
 ## Environment
 
-- Fedora release: <!-- `cat /etc/os-release | head -3` -->
-- WSL or bare metal / VM:
-- Running as: <!-- your user + sudo, or root -->
-- `core.lock` version: <!-- `grep core_version core.lock` -->
-- Shell the bootstrap was launched from: <!-- bash or zsh; it matters for PATH -->
-
-## Checks
-
-- [ ] This is **not** about a file under `core/` (those belong in
-      [dotfiles-core](https://github.com/dotgibson/dotfiles-core/issues))
-- [ ] `make lint` output, if relevant
-- [ ] `./bootstrap.sh --dry-run` output, if the problem is about what gets linked/installed
+- OS / distro:
+- zsh version (`zsh --version`):
+- Relevant tool versions (shellcheck, luacheck, …):
