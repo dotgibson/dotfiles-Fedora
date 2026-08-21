@@ -36,7 +36,8 @@ procs          # ps — ORPHANED, last built F44; no rawhide/F45 build. Same dea
 yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (python-yq is the separate Python tool)
 glow           # markdown viewer
 gum            # shell-script UI toolkit (charm)
-# dust, xh, sd, doggo, carapace, sesh, gron, op (1Password CLI): NOT reliably in
+du-dust        # dust (du) — Fedora's package name; installs the `dust` binary, same as Debian's
+# xh, sd, doggo, carapace, sesh, gron, op (1Password CLI): NOT reliably in
 # Fedora repos — bootstrap.sh installs them via cargo / go / the 1Password repo.
 # Two were dropped by Fedora rather than never packaged: gron was orphaned (last
 # shipped F41/42) and sd was retired after F41 (rust-sd's `sd` subpackage, last
@@ -83,7 +84,7 @@ tree-sitter-cli # nvim-treesitter (main branch) compiles parsers locally — nee
 
 # ── misc useful ───────────────────────────────────────────────
 curl
-wget           # F42+ has no package literally named `wget`: it's a virtual capability
+wget           # F40+ has no package literally named `wget`: it's a virtual capability
                # whose default provider is `wget2-wget` (wget2). `dnf install wget`
                # still resolves, but installs wget2 — pin `wget1-wget` if you need
                # classic GNU wget semantics (--show-progress, FTP, WARC).

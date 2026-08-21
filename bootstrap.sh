@@ -447,7 +447,7 @@ provision() {
   # ── doctor-probed tools not (reliably) in Fedora repos ─────────────────────
   # Round out core-doctor's modern-CLI set. All best-effort (|| true) + presence-
   # guarded — same discipline as starship/atuin/yazi above; a failure here never
-  # aborts bootstrap. dust/xh via cargo (neither is packaged as of F45);
+  # aborts bootstrap. xh via cargo (not in Fedora repos);
   # doggo/carapace/sesh via go install (using an ephemeral mise-provided go when the
   # toolchain isn't already present); op via 1Password's official dnf repo.
   # GOBIN → ~/.local/bin so go-installed binaries land on PATH (the Fedora shell
@@ -473,8 +473,13 @@ provision() {
   # Each of these is a from-source Rust build costing minutes. Run them under ux_spin (which
   # keeps a live elapsed-time readout and replays the log only on failure) instead of
   # >/dev/null 2>&1, so a slow build reads as progress rather than as a wedged script.
+  # dust IS packaged (`du-dust`, F43→rawhide, binary /usr/bin/dust) and is in
+  # install/packages.txt, so on a normal box the guard below sees it and this block is a
+  # no-op. It stays as the safety net for the one case the RPM can't cover: the dnf
+  # install runs with --skip-unavailable, so if du-dust ever follows sd/gron out of the
+  # repos the name is dropped SILENTLY and cargo picks it up here instead.
   if ! command -v dust >/dev/null && command -v cargo >/dev/null; then
-    ux_spin "dust (cargo — crate du-dust; not in Fedora repos as of F45)" \
+    ux_spin "dust (cargo fallback — RPM du-dust preferred; crate du-dust)" \
       cargo install --locked du-dust || note_fail "dust: cargo build failed (log above) — retry later: cargo install --locked du-dust"
   fi
   if ! command -v xh >/dev/null && command -v cargo >/dev/null; then
@@ -489,7 +494,7 @@ provision() {
       cargo install --locked sd || note_fail "sd: cargo build failed (log above) — retry later: cargo install --locked sd"
   fi
   # viddy (watch replacement; Core aliases watch->viddy, HAVE_VIDDY-guarded) is a Rust
-  # CLI, not in Fedora repos — build from source via cargo like dust/xh above.
+  # CLI, not in Fedora repos — build from source via cargo like xh/sd above.
   if ! command -v viddy >/dev/null && command -v cargo >/dev/null; then
     ux_spin "viddy (cargo — watch replacement; not in Fedora repos)" \
       cargo install --locked viddy || note_fail "viddy: cargo build failed (log above) — retry later: cargo install --locked viddy"
