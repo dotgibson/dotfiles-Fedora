@@ -5530,15 +5530,43 @@ assert shown == keys, \"render-only: %s | json-only: %s\" % (sorted(shown - keys
 # Direction is deliberately one-way: probed ⊆ reported. The reverse would fail on `op` (no
 # HAVE_OP — the doctor probes it live) and on `fd`/`bat`, which 00-tools.zsh sets from
 # FD_BIN/BAT_BIN after resolving fdfind/batcat rather than with a bare `_have` line.
+# `^_have +` and not `^_have `: 00-tools.zsh aligns a couple of trailing comments with two
+# spaces (tldr is one), and the single-space form silently dropped those rows from the set —
+# a coverage guard that read stronger than it was. The quantifier takes it 37 → 38.
 check_dep "core-doctor reports every tool 00-tools.zsh probes (no silently undetected tools)" python3 \
   '_TOOLS_SRC="'"$HERE"'/zsh/00-tools.zsh" _CD_J="$(core-doctor --json)" python3 -c "
 import json, os, re
-probed   = set(re.findall(r\"(?m)^_have ([A-Za-z0-9_.-]+)\", open(os.environ[\"_TOOLS_SRC\"]).read()))
+probed   = set(re.findall(r\"(?m)^_have +([A-Za-z0-9_.-]+)\", open(os.environ[\"_TOOLS_SRC\"]).read()))
 reported = set(json.loads(os.environ[\"_CD_J\"])[\"tools\"])
 missing  = sorted(probed - reported)
 assert probed, \"parsed no _have lines out of 00-tools.zsh\"
 assert not missing, \"detected by 00-tools.zsh but absent from core-doctor: %s\" % missing
 "'
+# ...and now the REVERSE direction, which the note above declined to assert because three
+# rows legitimately have no `_have` line. Declining it entirely left a hole: the check above
+# derives its tool -> flag mapping from the very line that sets the flag, so DELETING
+# `_have jq && HAVE_JQ=1` does not make it fail — it just removes jq from both sides and the
+# suite goes quiet. That is the #447 failure mode itself (the doctor promising a tool Core
+# never wired), so assert it directly, with the three exceptions named rather than waived.
+#
+# op is deliberate: the doctor probes it live and no alias or function is gated on it. fd and
+# bat are set from FD_BIN/BAT_BIN after resolving fdfind/batcat, so their assignments do not
+# match `^_have`. A NEW name showing up here is not a fourth exception to add — it means a
+# doctor row has no detection behind it, which is the bug.
+# Pure zsh so it runs everywhere; _CORE_DOCTOR_GROUPS is the inventory the parity test above
+# already proves equal to both renderers' output.
+check "every core-doctor row has a HAVE_* probe behind it (or is a documented exception)" \
+  'paired=(); exempt=(op fd bat); missing=()
+   for line in ${(f)"$(<'"$HERE"'/zsh/00-tools.zsh)"}; do
+     [[ $line =~ "^_have +([A-Za-z0-9_.-]+) +&& +HAVE_[A-Z0-9_]+=1" ]] && paired+=($match[1])
+   done
+   (( ${#paired} >= 30 )) || { print -r -- "parsed only ${#paired} _have lines"; exit 1; }
+   for ((gi = 2; gi <= ${#_CORE_DOCTOR_GROUPS}; gi += 2)); do
+     for t in ${=_CORE_DOCTOR_GROUPS[gi]}; do
+       (( ${paired[(I)$t]} )) || (( ${exempt[(I)$t]} )) || missing+=($t)
+     done
+   done
+   (( ${#missing} == 0 )) || { print -r -- "doctor rows with no detection behind them: $missing"; exit 1; }'
 # git-absorb is the first --json tools key that is NOT a bare identifier, and the JSON is
 # hand-rolled by _core_doctor_json rather than produced by a serialiser — so the hyphen has
 # to survive quoting on its own merit. The set-equality check above cannot see this: it
@@ -5598,6 +5626,45 @@ check "_core_wired accepts carapace's current hook name (_carapace_completer)" \
   '_carapace_completer() { :; }; _core_wired carapace'
 check "_core_wired is false for an idle carapace" \
   '_core_wired carapace 2>/dev/null; (( $? != 0 ))'
+# ── The wired list must not drift from the arms that implement it (#447) ──────────────
+# _CORE_DOCTOR_WIRED is what BOTH renderers iterate; the `case` arms of _core_wired are what
+# actually probe. Those were three hand-synced literals until this change, and — unlike the
+# tool axis — nothing could see a drift: the render⇄json parity test above stubs _core_have
+# false, which makes the "integrations wired" block skip every entry by construction. So the
+# guard has to be built here, in both directions, because the two drifts are different bugs.
+#
+# The sentinel first, because the next assertion is vacuous without it: an unknown name must
+# return exactly 2, not merely non-zero. Reverting that arm to `return 1` makes "no arm for
+# this name" indistinguishable from "installed but idle" and silently disarms the check below.
+check "_core_wired returns the distinct exit 2 for a name it has no arm for" \
+  '_core_wired bogustool 2>/dev/null; (( $? == 2 ))'
+# Direction 1 — every listed name has an arm. This is the drift that renders a WRONG report:
+# a name in the array with no arm falls to `*)` and prints `○ (idle)` forever, on every box,
+# no matter what the user installs or configures. Runtime, so it needs no source parsing.
+# `_core_wired` is called with the hooks undefined, so a correctly-armed tool returns 1 here;
+# only 2 is a failure.
+check "every _CORE_DOCTOR_WIRED entry has a matching _core_wired arm" \
+  'for t in $_CORE_DOCTOR_WIRED; do
+     _core_wired "$t" 2>/dev/null
+     (( $? == 2 )) && { print -r -- "no _core_wired arm for: $t"; exit 1; }
+   done
+   (( ${#_CORE_DOCTOR_WIRED} > 0 ))'
+# Direction 2 — every arm is listed. This is the drift that renders a MISSING report: a tool
+# gains a probe nobody iterates, so its wiredness is never shown and the omission is silent
+# (exactly how twelve tools went unreported on the tool axis for releases). Not observable at
+# runtime — an unlisted arm is unreachable by definition — so read the arms out of the source,
+# the same technique as the "probed ⊆ reported" test above. Skips without python3, like its
+# neighbours.
+check_dep "every _core_wired arm appears in _CORE_DOCTOR_WIRED (no unreachable probes)" python3 \
+  '_FN_SRC="'"$HERE"'/zsh/30-functions.zsh" _CD_W="$_CORE_DOCTOR_WIRED" python3 -c "
+import os, re
+src  = open(os.environ[\"_FN_SRC\"]).read()
+body = re.search(r\"(?s)^_core_wired\\(\\) \\{.*?^\\}\", src, re.M).group(0)
+arms = set(re.findall(r\"(?m)^  ([a-z][a-z0-9-]*)\\)\", body))
+listed = set(os.environ[\"_CD_W\"].split())
+assert arms, \"parsed no case arms out of _core_wired\"
+assert not arms - listed, \"probed by _core_wired but never rendered: %s\" % sorted(arms - listed)
+"'
 # core-help (U5): the width-aware renderer must emit every verb and never crash on its
 # kw arithmetic — including a pathologically narrow terminal where the key column clamps.
 check "core-help renders all verbs (wide terminal)" \
@@ -6298,6 +6365,157 @@ ucheck "renamed: neither present → no bat/fd/cat alias and the doctor reports 
   "source '$TOOLS_FILE'; source '$ALIASES_FILE'; source '$UI'; source '$FN'; j=\$(core-doctor --json); [[ -z \${HAVE_BAT:-} && -z \${HAVE_FD:-} ]] && ! (( \$+aliases[bat] )) && ! (( \$+aliases[fd] )) && ! (( \$+aliases[cat] )) && [[ \$j == *'\"bat\":false'* && \$j == *'\"fd\":false'* ]]" \
   PATH="$RNBIN" CORE_NO_PAGER=1
 
+
+# ── user bindirs reach PATH BEFORE detection (#425) ──────────────────────────
+# 00-tools.zsh prepends the per-user bindirs language installers write into, then probes
+# for HAVE_* flags. It used to prepend only ~/.local/bin, so a `cargo install`ed tool —
+# which lands in $CARGO_HOME/bin, and reached PATH only via the OS layer at band 80, a
+# whole load-order band AFTER detection — got no flag, no alias, and no shell init, while
+# core-doctor (which probes LIVE, later, against the finished PATH) reported it ✓. Same
+# shell, two answers. atuin's own installer writes ~/.atuin/bin and had the identical
+# hole, which is the severe one: no HAVE_ATUIN means `atuin init zsh` never runs, so
+# Ctrl+E is dead and no history is recorded behind a green doctor row.
+#
+# Hermetic, and it has to be: the box running this suite has its own cargo/go/atuin dirs
+# one way or the other, and neither arrangement can prove the other's. Each case pins HOME
+# to a purpose-built fixture and PATH to a stub dir holding nothing but real grep/head.
+#
+# CARGO_HOME/GOBIN/GOPATH are neutralised (passed EMPTY — `:-` treats empty as unset) in
+# every case that is not deliberately setting them. That is the same trap v4.13.2 fixed in
+# the blib_user_bindirs_on_path fixture below: the resolution is `${CARGO_HOME:-$HOME/...}`
+# precisely so a relocated dir still works, so a developer with CARGO_HOME exported in
+# their own shell retargets the lookup, the fixture's dir never lands, and the case reds a
+# perfectly healthy tree while no CI runner — none of which export it — ever sees it.
+UBHOME="$SANDBOX/ubhome"
+UBSYS="$SANDBOX/ubsys"
+mkdir -p "$UBSYS"
+ln -sf "$(command -v grep)" "$UBSYS/grep"
+ln -sf "$(command -v head)" "$UBSYS/head"
+_ub_fixture() { # _ub_fixture <reldir>:<tool> ... — fresh $UBHOME holding exactly these stubs
+  rm -rf "$UBHOME"
+  mkdir -p "$UBHOME"
+  local spec d n
+  for spec in "$@"; do
+    d="${spec%%:*}"
+    n="${spec##*:}"
+    mkdir -p "$UBHOME/$d"
+    # Answers --version and NOTHING else: `atuin init zsh` must emit no script, or
+    # _cache_eval would source the stub's chatter back into the shell.
+    printf '#!/bin/sh\n[ "$1" = --version ] && echo "%s 1.0.0"\nexit 0\n' "$n" >"$UBHOME/$d/$n"
+    chmod +x "$UBHOME/$d/$n"
+  done
+}
+
+# (a) THE REPORTED BUG: a cargo-installed tool is detected, aliased and wired.
+_ub_fixture .cargo/bin:procs
+ucheck "bindirs: a tool in ~/.cargo/bin sets HAVE_PROCS and gets its alias (#425)" \
+  "source '$TOOLS_FILE'; source '$ALIASES_FILE'; [[ -n \${HAVE_PROCS:-} && \${aliases[ps]} == procs ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME= GOBIN= GOPATH=
+
+# (b) THE SEVERE ONE: atuin's own installer dir, whose miss silently loses history.
+_ub_fixture .atuin/bin:atuin
+ucheck "bindirs: a tool in ~/.atuin/bin sets HAVE_ATUIN (so atuin init zsh runs)" \
+  "source '$TOOLS_FILE'; [[ -n \${HAVE_ATUIN:-} ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME= GOBIN= GOPATH=
+
+# (c) RELOCATABLE: rustup honours $CARGO_HOME, so hard-coding ~/.cargo/bin would leave a
+# relocated box still undetected. NOTE there is no ~/.cargo/bin in this fixture at all —
+# the flag can only be set by resolving through the variable.
+_ub_fixture xdgcargo/bin:procs
+ucheck "bindirs: CARGO_HOME is honoured (a relocated cargo dir is still detected)" \
+  "source '$TOOLS_FILE'; [[ -n \${HAVE_PROCS:-} ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME="$UBHOME/xdgcargo" GOBIN= GOPATH=
+
+# (d) go honours $GOBIN first.
+_ub_fixture gobin:xh
+ucheck "bindirs: GOBIN is honoured" \
+  "source '$TOOLS_FILE'; [[ -n \${HAVE_XH:-} ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME= GOBIN="$UBHOME/gobin" GOPATH=
+
+# (e) …then $GOPATH — which is a path LIST, and go writes to the FIRST entry's bin/.
+# Expanding "$GOPATH/bin" against /a:/b would probe a nonexistent "/a:/b/bin", so this
+# asserts BOTH that the first entry is used and that no such bogus entry is built.
+_ub_fixture gopath/bin:xh second/bin:gron
+ucheck "bindirs: GOPATH's FIRST entry is used, and no bogus /a:/b/bin entry is built" \
+  "source '$TOOLS_FILE'; [[ -n \${HAVE_XH:-} && -z \${HAVE_GRON:-} && \$PATH != *'gopath:'* ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME= GOBIN= GOPATH="$UBHOME/gopath:$UBHOME/second"
+
+# (f) IDEMPOTENT: the guard is a containment test, so a second source must not duplicate.
+# Duplicates are not cosmetic — 00-tools.zsh is re-sourced by `core reload`, and an
+# unbounded PATH is a real leak over a long session.
+_ub_fixture .cargo/bin:procs .local/bin:eza
+ucheck "bindirs: sourcing twice adds each dir exactly once" \
+  "source '$TOOLS_FILE'; source '$TOOLS_FILE'; p=(\${(s.:.)PATH}); [[ \${#\${(M)p:#\$HOME/.cargo/bin}} == 1 && \${#\${(M)p:#\$HOME/.local/bin}} == 1 ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME= GOBIN= GOPATH=
+
+# (g) Only dirs that EXIST are added — no phantom entries on a box without go or atuin.
+_ub_fixture .cargo/bin:procs
+ucheck "bindirs: directories that do not exist are never added to PATH" \
+  "source '$TOOLS_FILE'; [[ \$PATH != *'/go/bin'* && \$PATH != *'/.atuin/bin'* && \$PATH == *'/.cargo/bin'* ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME= GOBIN= GOPATH=
+
+# (h) ORDER IS A DECISION, not an accident. Each existing dir is prepended, so the front of
+# PATH ends up in reverse list order: ~/.atuin/bin ahead of ~/.local/bin. That matches
+# lib/bootstrap-lib.sh's blib_user_bindirs_on_path, examples/atuin-daemon.service's
+# Environment=PATH, and the OS layers — inverting it here would silently change which
+# binary wins on a box holding atuin in both places.
+_ub_fixture .cargo/bin:procs .local/bin:eza .atuin/bin:atuin
+ucheck "bindirs: ~/.atuin/bin precedes ~/.local/bin, and all of them precede the old PATH" \
+  "source '$TOOLS_FILE'; p=(\${(s.:.)PATH}); [[ \${p[(i)\$HOME/.atuin/bin]} -lt \${p[(i)\$HOME/.local/bin]} && \${p[(i)\$HOME/.local/bin]} -lt \${p[(i)$UBSYS]} ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME= GOBIN= GOPATH=
+
+# (i) THE DISAGREEMENT ITSELF. The issue's symptom was not "no alias" but that core-doctor
+# and the flags answered differently about the same tool in the same shell. Assert they now
+# agree: the doctor says present AND Core wired it. Before the fix the first half passed and
+# the second failed, which is exactly the bug.
+_ub_fixture .cargo/bin:procs
+ucheck "bindirs: core-doctor and HAVE_PROCS now agree about a cargo-installed tool (#425)" \
+  "source '$TOOLS_FILE'; source '$ALIASES_FILE'; source '$UI'; source '$FN'; j=\$(core-doctor --json); [[ \$j == *'\"procs\":true'* && -n \${HAVE_PROCS:-} && \${aliases[ps]} == procs ]]" \
+  HOME="$UBHOME" PATH="$UBSYS" CARGO_HOME= GOBIN= GOPATH= CORE_NO_PAGER=1
+
+# ── ...and the same agreement for EVERY probed tool, not just the one that was reported ──
+# #447's point: the five bugs it collected were one defect sampled five times, and the reason
+# CI never caught any of them is that nothing asserted the two answers match. The check above
+# pins procs because procs is what #425 happened to be reported against; a sixth tool
+# packaged unusually would have walked straight past it. Generalise: for every tool
+# 00-tools.zsh probes, "the doctor says present" and "Core set the flag" must be the SAME
+# boolean. A disagreement in either direction is a bug — doctor=1/flag=0 is #425 exactly (a
+# green row for a tool Core never wired, so no alias, and for atuin no history recorded),
+# and doctor=0/flag=1 is the mirror (Core wired something the report calls absent).
+#
+# The tool -> flag mapping is READ OUT OF THE SOURCE, never restated here, so it cannot rot
+# and needs no hand-maintained table for the two irregular names (ast-grep -> HAVE_ASTGREP,
+# git-absorb -> HAVE_GIT_ABSORB). The `+` quantifiers matter: 00-tools.zsh aligns some
+# comments with two spaces, and a single-space regex silently drops those rows.
+#
+# Excluded BY CONSTRUCTION rather than by a skip list, which is why the pattern is anchored
+# to `^_have`: op has no _have line (the doctor probes it live), and fd/bat are set from
+# FD_BIN/BAT_BIN inside `if` blocks after resolving fdfind/batcat — all three are pinned by
+# their own tests above. Sourcing 20-aliases.zsh keeps this close to a real shell; the one
+# alias that shadows a row name (`alias fd=$FD_BIN`) is already outside the pair list.
+#
+# Pure zsh, no python3: the values are bare true/false against a quoted unique key, so a
+# substring test is exact — and unlike the check_dep neighbours this then runs everywhere
+# instead of skipping on a box without python3. $'\42' is a literal double quote, which
+# survives this bash layer without a thicket of backslashes.
+# NO env overrides and no fixture: this one wants the REAL box — real PATH, real tools,
+# whatever this runner happens to have installed. That is the whole point. It is only as
+# strong as the runner is populated, but it costs nothing on a bare one (everything absent,
+# everything unflagged, agreement holds) and it is the assertion that fails the moment a
+# tool arrives by a route detection misses.
+ucheck "core-doctor and every HAVE_* flag agree about the same box (#447)" \
+  "source '$TOOLS_FILE'; source '$ALIASES_FILE'; source '$UI'; source '$FN'
+   j=\$(core-doctor --json); bad=(); n=0
+   for line in \${(f)\"\$(<'$TOOLS_FILE')\"}; do
+     [[ \$line =~ '^_have +([A-Za-z0-9_.-]+) +&& +(HAVE_[A-Z0-9_]+)=1' ]] || continue
+     t=\$match[1]; f=\$match[2]; (( n++ ))
+     [[ \$j == *\$'\\42'\$t\$'\\42'':true'* ]] && d=1 || d=0
+     [[ -n \${(P)f:-} ]] && h=1 || h=0
+     (( d == h )) || bad+=(\"\$t (doctor=\$d \$f=\$h)\")
+   done
+   (( n >= 30 )) || { print -r -- \"parsed only \$n tool->flag pairs out of 00-tools.zsh\"; exit 1; }
+   (( \${#bad} == 0 )) || { print -r -- \"doctor and HAVE_* disagree: \${(j:, :)bad}\"; exit 1; }" \
+  CORE_NO_PAGER=1
 # ── git subcommands in git's exec-path: an honest doctor off $PATH (#424) ────
 # The Debian family packages a git SUBCOMMAND into git's exec-path (`git --exec-path`) and
 # keeps that directory off $PATH on purpose — git dispatches `git absorb` by looking there
