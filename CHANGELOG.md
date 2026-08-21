@@ -41,6 +41,15 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 - **`.gitignore` no longer ignores the tracked `core/.claude/` files.** The `.claude/`
   pattern was unanchored, so it matched at any depth — a hazard for a vendored tree whose
   git tree SHA must match `core.lock`.
+- **Three availability claims in `bootstrap.sh` that stopped being true.** The section
+  header, the `dust` spinner label and the `viddy` comment all said dust is not packaged
+  on Fedora; `du-dust` has shipped continuously (F43 `1.2.4-2`, F44 `1.2.4-5`, rawhide
+  `1.2.5-1.fc46`). They now name only the tools that genuinely need a source build.
+- **`install/packages.txt` dates the `wget` virtualisation to F40, not F42.** Fedora's
+  [Wget2asWget](https://fedoraproject.org/wiki/Changes/Wget2asWget) change targeted
+  Fedora Linux 40 — the note was two releases late. The rest of it (no package literally
+  named `wget`, default provider `wget2-wget`, pin `wget1-wget` for classic semantics)
+  was already correct.
 
 ### Added
 
@@ -60,6 +69,12 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
   (`make lint` / `check` / `dry-run` / `integrity` / `hooks`).
 - `packages` workflow — resolves every name in `install/packages.txt` against a matrix of
   supported Fedora releases, replacing hand-maintained availability prose with a check.
+- **`du-dust` to `install/packages.txt` — `dust` is an RPM, not a from-source build.**
+  Fedora packages it under the same name Debian does (`du-dust`, binary `/usr/bin/dust`),
+  and every fresh box was instead spending minutes on `cargo install --locked du-dust` for
+  a tool `dnf` already had. The cargo block stays as a presence-guarded fallback: it is a
+  no-op once the RPM is in, and it is what catches `dnf --skip-unavailable` silently
+  dropping the name if `du-dust` ever follows `sd`/`gron` out of the repos.
 
 ### Removed
 
