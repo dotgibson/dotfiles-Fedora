@@ -13,7 +13,95 @@ commit (`git tag -a vX.Y.Z -m vX.Y.Z`).
 
 ## [Unreleased]
 
+## [v4.14.0] - 2026-08-21
+
+### Changed
+
+- **nvim plugin pins move forward for five plugins.** `nui.nvim`, `nvim-lint`,
+  `nvim-lspconfig`, `package-info.nvim` and `schemastore.nvim` advance to the commits
+  lazy.nvim had already resolved on a live box, 2–7 days ahead of the pins Core carried.
+
+  Every new SHA was verified to exist upstream and to be newer than the one it replaces,
+  and each range was read before promotion: `nui.nvim` one additive commit (borderless
+  tables, `set_data`, cell navigation); `nvim-lint` two (zlint source name, relative
+  `artifactLocation.uri` in sarif output); `nvim-lspconfig` twelve, all per-server fixes
+  or additions plus generated docs (`vhdl_ls`, `tsc`, `symfony_lsp`, `slang-server`,
+  `php_lsp`, `oxc`); `package-info.nvim` one notification fix; `schemastore.nvim` two
+  catalog refreshes. Nothing renames or removes an API Core calls.
+
+  Provenance worth recording, because it is the failure mode this repo warns about: these
+  bumps were found as an uncommitted edit to `dotfiles-Fedora`'s **vendored** `core/nvim/
+  lazy-lock.json`. That tree is a copy — the next `make sync` overwrites it — so the bumps
+  were days from being silently reverted, and would have come back on the next `lazy sync`
+  to be lost again. They belong here, once, and reach every machine by fan-out.
+
+### Added
+
+- **A gate against leaked `RETURN` traps, for the fleet and for Core's own tree.**
+  (#552, #555, #558; refs #512, #461) A bash `RETURN` trap is a **global slot, not a
+  function-scoped one**: armed inside a function it survives into the _caller's_ frame and
+  fires a second time on that frame's return, where the local it cleans up is out of scope
+  and `set -u` makes it fatal. In `dotfiles-Debian` that aborted `provision()` after every
+  package had installed but before `wire_links` ran — a box carrying the whole stack and
+  not one symlink, wearing the costume of a near-complete run
+  (dotgibson/dotfiles-Debian#2).
+
+  Nothing could see it, and nothing was wrong with the gates that missed it. The broken
+  line is **valid bash**, so `lint-call.yml`'s shellcheck and `bash -n` legs both pass it;
+  and `bootstrap-test.yml` only ever runs `--links-only`, so no job anywhere in the fleet
+  executes `provision()` at all. A textual scan is the only thing that catches this class,
+  which is why it is its own leg rather than another `SHELLCHECK_OPTS` entry.
+
+  `scripts/lib/common.sh` gains `_core_return_trap_hits`, the single definition of the
+  rule. `audit-core.sh` §5e runs it over Core's own tree (which lint-call.yml never checks
+  out), and `lint-call.yml` sources it to gate the nine caller repos — **so a caller repo
+  now fails its required `lint` check on a leaked trap.** Every repo in the fleet was
+  verified green under it before release, so nothing reds on arrival.
+
+  Two notes for anyone writing one of these. The correct form is
+  `trap 'trap - RETURN; …' RETURN` — disarm first, and keep it first, so an early `return`
+  inside the body cannot skip it. And when this bug does surface at runtime the reported
+  line number is a **decoy**: bash attributes a `RETURN` trap to the last nested function
+  _definition_ in the frame, so Debian's abort blamed `_add_vendor_repo`, which had nothing
+  to do with it. Grep for the trap, not the line.
+
+  The pattern is deliberately looser than the one dotfiles-Debian shipped. `trap` is
+  matched as a word **anywhere on the line**, because anchoring to line-start misses
+  `f() { trap … RETURN; }` — the one-line body, and the likeliest shape; against a fixture
+  carrying four broken forms the anchored version catches one. The signal is matched as a
+  **token** rather than as the last word, so a trailing comment and a two-signal
+  `RETURN EXIT` are caught too. Whole-line comments are filtered, because Debian's own fix
+  carries three comment lines naming the signal directly above its corrected traps — an
+  unfiltered scanner would red the repo that fixed the bug. Ten fixtures in
+  `scripts/test-core.sh` pin both halves, plus two assertions that keep `lint-call.yml`
+  calling the helper instead of growing a second copy of the expression.
+
+  **zsh is out of scope, permanently:** it has no `RETURN` signal at all
+  (`trap 'x' RETURN` → _undefined signal_), so the bug cannot exist there.
+
 ### Fixed
+
+- **Every `core.lock` in the fleet told the reader to recover with `make core-lock`, a
+  command that mostly does not exist and does not regenerate the lock where it does.**
+  (#557) `sync-core.sh` stamped that hint into the generated header unconditionally, and it
+  was wrong three ways at once: the target is absent from `dotfiles-core` itself and from
+  most consumers (which carry no root `Makefile`); in the one repo that has it,
+  `dotfiles-Offense`, it regenerates nothing and just prints a redirect back to the
+  fan-out; and it pointed away from the recovery `VENDORING.md` already prescribes — re-run
+  the fan-out from Core, never patch the lock by hand.
+
+  That line is read at the worst possible moment. `core-integrity.sh` reports `TAMPERED
+  (core/ edited since sync)` whenever the vendored tree and the lock disagree, which reads
+  like someone hand-edited `core/`; the first thing the confused reader does is open
+  `core.lock`, where the header sent them to a dead end. The generated header now names the
+  real recovery and says why the hand route fails, and the two docs that repeated the
+  `make core-lock` caveat are corrected — they warned it was _missing_ in some repos,
+  which understated it: it does not do the job anywhere.
+
+  Note for the first sync after this lands: the header's bytes change, so `sync-core.sh`'s
+  idempotency skip will not fire on that pass and each repo takes one
+  `chore(core): core.lock → …` commit. Nothing else moves. Left open in #557: whether
+  `dotfiles-Offense` should keep a `core-lock` target now that nothing points at it.
 
 - **The doctor's wirable list was three hand-synced copies with nothing able to see a drift,
   and no test asserted that a `✓` row means Core actually wired anything.** (#447) Meta-issue
