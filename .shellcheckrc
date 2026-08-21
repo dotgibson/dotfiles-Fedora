@@ -1,24 +1,20 @@
-# .shellcheckrc — repo-wide ShellCheck config so author-time, pre-commit, CI, and the
-# editor (bashls / nvim) all lint identically. Without this, the only settings were the
-# `-x` flag and SHELLCHECK_OPTS that the reusable lint workflow passes — so an editor
-# opening bootstrap.sh saw none of them and could disagree with CI.
-#
-# The excludes below MIRROR the reusable gate in dotfiles-core
-# (.github/workflows/lint-call.yml: SHELLCHECK_OPTS="-e SC1090 -e SC1091 -e SC2015 -e SC2088").
-# Keep them in step: if that list changes upstream, change it here too, or `make lint`
-# and CI will disagree.
+# .shellcheckrc — repo-wide ShellCheck config so author-time, CI, and editor
+# (bashls / nvim) all lint identically. Previously the only ShellCheck settings were
+# the `-x` flag the audit passes and per-file `# shellcheck` directives scattered in
+# the scripts; an editor opening a script saw none of that and could disagree with CI.
+# This centralises the cross-cutting bits. File-SPECIFIC suppressions (e.g. the
+# intentional SC2016 in test-core.sh / bench-core.sh, where `$` in single quotes is
+# expanded by a zsh CHILD, not this bash parent) deliberately stay inline, next to the
+# code that needs them — they are not global truths and must not be hidden here.
 
-# Follow `source`-d files so `-x` resolves core/lib/ux.sh + core/lib/bootstrap-lib.sh
-# from any working directory.
+# Follow `source`/`.`-d files so `-x` works from any working directory, and resolve a
+# sourced path relative to the script being checked (SCRIPTDIR) — this is what lets the
+# gate scripts' `source "${BASH_SOURCE[0]%/*}/lib/common.sh"` resolve in an editor
+# without each file needing an inline `# shellcheck source=` directive.
 external-sources=true
 source-path=SCRIPTDIR
+source-path=scripts
 
-# Lint as bash: bootstrap.sh is #!/usr/bin/env bash, and the libs it sources carry no
-# shebang. (zsh has no ShellCheck mode — os/fedora.zsh is checked with `zsh -n` instead.)
+# Lint as bash: every runnable script here is `#!/usr/bin/env bash`, and the sourced
+# libraries (scripts/lib/*.sh) carry no shebang, so pin the dialect explicitly.
 shell=bash
-
-# House-style suppressions, matching the fleet gate:
-#   SC1090/SC1091 — runtime `source` of paths ShellCheck cannot follow statically
-#   SC2015        — the deliberate `cmd && ok || warn` idiom used throughout
-#   SC2088        — tildes inside quoted user-facing MESSAGES (not paths to expand)
-disable=SC1090,SC1091,SC2015,SC2088
