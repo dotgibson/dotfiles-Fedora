@@ -1,11 +1,8 @@
-blank_issues_enabled: true
+# Force a template choice — a blank issue on the keystone repo usually means it
+# belonged in an OS repo or dotfiles-Offense instead. The two templates above route
+# that decision via the three-layer test.
+blank_issues_enabled: false
 contact_links:
-  - name: 📖 Documentation
-    url: https://dotgibson.github.io/dotfiles-web/docs/repos/dotfiles-Fedora
-    about: The documentation hub for this layer, including the porting matrix.
-  - name: 🧩 Shared config (zsh, tmux, nvim, git, starship)
-    url: https://github.com/dotgibson/dotfiles-core/issues
-    about: Anything under core/ is vendored from dotfiles-core — please file it there.
-  - name: 🔒 Security issue
-    url: https://github.com/dotgibson/dotfiles-Fedora/security/advisories/new
-    about: Please report vulnerabilities privately, not as a public issue.
+  - name: Security report
+    url: https://github.com/security/advisories
+    about: "Do not file security issues publicly — use private vulnerability reporting (see SECURITY.md)."
