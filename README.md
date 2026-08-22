@@ -77,7 +77,7 @@ The system is three layers, each building on the one below:
 | Layer | Lives in | Owns |
 | --- | --- | --- |
 | **Core** | [`dotfiles-core`](https://github.com/dotgibson/dotfiles-core) → vendored into every OS repo's `core/` | zsh, tmux, nvim, git, starship — identical everywhere |
-| **OS-native** | **this repo** + `dotfiles-{MacBook,Windows,Arch,openSUSE,Alpine,Gentoo}` | package manager, clipboard, paths |
+| **OS-native** | **this repo** + `dotfiles-{MacBook,Windows,Arch,Debian,openSUSE,Alpine,Gentoo}` | package manager, clipboard, paths |
 | **Role** | `dotfiles-Offense`, `dotfiles-Defense` | offensive / defensive tooling |
 
 ### Languages
@@ -213,29 +213,29 @@ Project Link: [dotgibson](https://github.com/dotgibson/)
 <!-- Markdown Links & Images -->
 [repo-docs]: https://dotgibson.github.io/dotfiles-web/docs/repos/dotfiles-Fedora
 [porting]: https://dotgibson.github.io/dotfiles-web/docs/reference/porting-matrix
-[dotgibson-shield]: https://img.shields.io/github/v/release/dotgibson/dotfiles-core?style=flat-square&label=dotgibson&labelColor=181717&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAF1klEQVR4nLSWbUxT7RnHr9PT09MXSltaoC9QXkqR16Iwhb0Iw8VYYE7jPri5aBaZzpmFZbpolpn4QeMyM%2BM%2B7MVt0Q9LNJIlxCzqxGWS6aKAig51vBQKIi3QltpCS0%2Fbc879pD1N3%2Bnz4fG5Pl2977v%2F331d131f5%2BZrddWQZAgAgy9uCRlefICzT6GeIsP%2FXF15kahmu9JglGmLRQoRQdIQWgu77BuWGe%2Fo%2BOqym8odApaWomTT1%2Bl2HqirahaTuJ9kQMggkgYhDRGfRiQDZBi9fuf52%2BD7l1b3ZhRcmq%2FMnBHmibuO7fvWoTalVoDjQRwL8RGgEOtzB0MbtBDnkRjGR0AgTK%2BQfNukr1LKXlhXKZpJSxTKGoFSq9vf16tQ8%2FiEh094Vu0L449mLGMup20DRWuFYVCiFm%2BvU36nTbOlMB%2BnCDxIOBzhvv6nFpc3TS0dUKDRHzh1Jk9O8wlPYN326Oa%2FJobnN8shAOxqKjrdXa8WSnGKWPewR%2FuHLG5P8oKUFJHi%2FH19F6UKEQ%2BnbJap27%2B%2BtWR15VAHgLkV%2F%2F0xW6OuQCfNE4PgmyX6f0xZKYbJDuj43lmtoYqHU%2FaZdwNXr4eoUG51zqgw%2B%2FCtrbm0UCeRynBhqVj2YC4RNC%2FuqStbKkydAODzeO7%2B6QYTpnOIYgB729R729RY9DAGafb0wDOHLwAA5vKK1mJNFoCpsxeLLn%2Fy91uU359719%2FfVXL%2BSM35IzU9rcXciCcQujz0imOfbGhOB0jkGo2hFQBW7Quzr0Zzq6vyBT%2FuKY%2BHErfBmQWLK1Lhr6l1OkleCqC0poPb%2FuTwv3OrA8DPDhgkokgLmLX77o86kqcGJmaj5xjr1JWlAAr1Js75MDEGAAI%2B1mvWX%2F1JY29XmYDPS5ZoNsrM24si1xSh3%2FRbGBYlz%2F73g41ztqliqYv1onyVHgDocMjjXASAKycavlqnZBHa2ajcasjv%2B8MbAPhRV9nI5MezB41crIPPHWOW9Gtl9XhDDCMCokIqSwGQ4shvyucFhEQCnqlSdm9k%2BdKt6XM%2FqO7aof7t8YbIIW5SHdpVIhUTAOAP0L8bmM3MHgJwByidQCgnhSmAqOEYnQ8AgRBr%2FuUzKsgggIs3pyVCfkeTCgAmFtaNOgm39C%2F3511r2W8JYvIAJbIaAwQ3vKAEoVgRaTQIBYKxqxgMs6euvdUXiQDgeHd5rV7K1fb2kC2rOgaYghQBMJ5grI3HUGuuhQiNIOWq8sy%2FLTgCKplgT0ZtCyprWw7%2FvKCyNr6yQqYg8cim59a9KQDnwv84R1%2F99UwAzsMya4vxeOYLN7YePGG%2BcAPjxXS%2BoavknFfOlRTAh8nHKNqLa1v2ZwK6dxQZtHk5ahu3%2FcYmLsoh%2B%2FsUgN%2BztDQzEvkYFBurGnan%2FS1%2B1P98L1FbxLIPzh193X%2FtwbmjiGUBYHd5nVFRCABPlxdtfh%2B3LHGKxof%2Bqo90C6yj58yi9Tm1kWjr94ZXsGhTuDuynAx2z0245yY4X06Kf9HWFd0N%2BuPbsUR64%2B3a57Erig2qIoOIlJSUNE69GWTZRFufXvRNL%2Fo2ywyJE1fMP6xWqHBEP5yfvP7%2FbAAAsFufG01mkVCqkGvLyrbNTD2mw9kfDckmE0oudx9rUZfhiF5Zd%2F%2F00QDF0NkBTJhanB3e0riHJIRKhXarqWfdu%2Bx0WnOot1ftuNR90lhQzEO0L7B2YvCm3b%2BWNI%2ByffSLq757%2BPcquYaIvBtgdcXycuzO9MzTFdccd9IwDNMVlDaXbzPXtxsVhQRDEQzl8i6d%2Buf12Y%2BONDVMo6vOfHWJxHLz3l811u8WAEZABCNAAHSI8n8k2HABKRJjLJ8JECxFMAE%2BHXhiGb7yn35vcCNDKVsEcSuv%2BEpn%2B7Etla0CwAQIOBLBhrkt85kAnwm8mX95e%2FTOa9vUZiIxQI43r0Kura9uN5SYNMoyuVDGZ2nK73C65iy28Rezo44152bSKYAvz3ifVA1lDn0WAAD%2F%2F%2FWvXexgMwqgAAAAAElFTkSuQmCC
+[dotgibson-shield]: https://img.shields.io/github/v/release/dotgibson/dotfiles-core?style=plastic&label=dotgibson&labelColor=181717&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAF1klEQVR4nLSWbUxT7RnHr9PT09MXSltaoC9QXkqR16Iwhb0Iw8VYYE7jPri5aBaZzpmFZbpolpn4QeMyM%2BM%2B7MVt0Q9LNJIlxCzqxGWS6aKAig51vBQKIi3QltpCS0%2Fbc879pD1N3%2Bnz4fG5Pl2977v%2F331d131f5%2BZrddWQZAgAgy9uCRlefICzT6GeIsP%2FXF15kahmu9JglGmLRQoRQdIQWgu77BuWGe%2Fo%2BOqym8odApaWomTT1%2Bl2HqirahaTuJ9kQMggkgYhDRGfRiQDZBi9fuf52%2BD7l1b3ZhRcmq%2FMnBHmibuO7fvWoTalVoDjQRwL8RGgEOtzB0MbtBDnkRjGR0AgTK%2BQfNukr1LKXlhXKZpJSxTKGoFSq9vf16tQ8%2FiEh094Vu0L449mLGMup20DRWuFYVCiFm%2BvU36nTbOlMB%2BnCDxIOBzhvv6nFpc3TS0dUKDRHzh1Jk9O8wlPYN326Oa%2FJobnN8shAOxqKjrdXa8WSnGKWPewR%2FuHLG5P8oKUFJHi%2FH19F6UKEQ%2BnbJap27%2B%2BtWR15VAHgLkV%2F%2F0xW6OuQCfNE4PgmyX6f0xZKYbJDuj43lmtoYqHU%2FaZdwNXr4eoUG51zqgw%2B%2FCtrbm0UCeRynBhqVj2YC4RNC%2FuqStbKkydAODzeO7%2B6QYTpnOIYgB729R729RY9DAGafb0wDOHLwAA5vKK1mJNFoCpsxeLLn%2Fy91uU359719%2FfVXL%2BSM35IzU9rcXciCcQujz0imOfbGhOB0jkGo2hFQBW7Quzr0Zzq6vyBT%2FuKY%2BHErfBmQWLK1Lhr6l1OkleCqC0poPb%2FuTwv3OrA8DPDhgkokgLmLX77o86kqcGJmaj5xjr1JWlAAr1Js75MDEGAAI%2B1mvWX%2F1JY29XmYDPS5ZoNsrM24si1xSh3%2FRbGBYlz%2F73g41ztqliqYv1onyVHgDocMjjXASAKycavlqnZBHa2ajcasjv%2B8MbAPhRV9nI5MezB41crIPPHWOW9Gtl9XhDDCMCokIqSwGQ4shvyucFhEQCnqlSdm9k%2BdKt6XM%2FqO7aof7t8YbIIW5SHdpVIhUTAOAP0L8bmM3MHgJwByidQCgnhSmAqOEYnQ8AgRBr%2FuUzKsgggIs3pyVCfkeTCgAmFtaNOgm39C%2F3511r2W8JYvIAJbIaAwQ3vKAEoVgRaTQIBYKxqxgMs6euvdUXiQDgeHd5rV7K1fb2kC2rOgaYghQBMJ5grI3HUGuuhQiNIOWq8sy%2FLTgCKplgT0ZtCyprWw7%2FvKCyNr6yQqYg8cim59a9KQDnwv84R1%2F99UwAzsMya4vxeOYLN7YePGG%2BcAPjxXS%2BoavknFfOlRTAh8nHKNqLa1v2ZwK6dxQZtHk5ahu3%2FcYmLsoh%2B%2FsUgN%2BztDQzEvkYFBurGnan%2FS1%2B1P98L1FbxLIPzh193X%2FtwbmjiGUBYHd5nVFRCABPlxdtfh%2B3LHGKxof%2Bqo90C6yj58yi9Tm1kWjr94ZXsGhTuDuynAx2z0245yY4X06Kf9HWFd0N%2BuPbsUR64%2B3a57Erig2qIoOIlJSUNE69GWTZRFufXvRNL%2Fo2ywyJE1fMP6xWqHBEP5yfvP7%2FbAAAsFufG01mkVCqkGvLyrbNTD2mw9kfDckmE0oudx9rUZfhiF5Zd%2F%2F00QDF0NkBTJhanB3e0riHJIRKhXarqWfdu%2Bx0WnOot1ftuNR90lhQzEO0L7B2YvCm3b%2BWNI%2ByffSLq757%2BPcquYaIvBtgdcXycuzO9MzTFdccd9IwDNMVlDaXbzPXtxsVhQRDEQzl8i6d%2Buf12Y%2BONDVMo6vOfHWJxHLz3l811u8WAEZABCNAAHSI8n8k2HABKRJjLJ8JECxFMAE%2BHXhiGb7yn35vcCNDKVsEcSuv%2BEpn%2B7Etla0CwAQIOBLBhrkt85kAnwm8mX95e%2FTOa9vUZiIxQI43r0Kura9uN5SYNMoyuVDGZ2nK73C65iy28Rezo44152bSKYAvz3ifVA1lDn0WAAD%2F%2F%2FWvXexgMwqgAAAAAElFTkSuQmCC
 [dotgibson-url]: https://github.com/dotgibson/dotfiles-core/releases/latest
-[ci-shield]: https://img.shields.io/github/actions/workflow/status/dotgibson/dotfiles-Fedora/lint.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI
+[ci-shield]: https://img.shields.io/github/actions/workflow/status/dotgibson/dotfiles-Fedora/lint.yml?branch=main&style=plastic&logo=githubactions&logoColor=white&label=CI
 [ci-url]: https://github.com/dotgibson/dotfiles-Fedora/actions/workflows/lint.yml
-[lastcommit-shield]: https://img.shields.io/github/last-commit/dotgibson/dotfiles-Fedora?branch=main&style=flat-square&logo=git&logoColor=white
-[contributors-shield]: https://img.shields.io/github/contributors/dotgibson/dotfiles-Fedora.svg?style=flat-square&logo=github
+[lastcommit-shield]: https://img.shields.io/github/last-commit/dotgibson/dotfiles-Fedora?branch=main&style=plastic&logo=git&logoColor=white
+[contributors-shield]: https://img.shields.io/github/contributors/dotgibson/dotfiles-Fedora.svg?style=plastic&logo=github
 [contributors-url]: https://github.com/dotgibson/dotfiles-Fedora/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/dotgibson/dotfiles-Fedora.svg?style=flat-square&logo=github
+[forks-shield]: https://img.shields.io/github/forks/dotgibson/dotfiles-Fedora.svg?style=plastic&logo=github
 [forks-url]: https://github.com/dotgibson/dotfiles-Fedora/network/members
-[stars-shield]: https://img.shields.io/github/stars/dotgibson/dotfiles-Fedora.svg?style=flat-square&logo=github
+[stars-shield]: https://img.shields.io/github/stars/dotgibson/dotfiles-Fedora.svg?style=plastic&logo=github
 [stars-url]: https://github.com/dotgibson/dotfiles-Fedora/stargazers
-[issues-shield]: https://img.shields.io/github/issues/dotgibson/dotfiles-Fedora?style=flat-square&logo=github
+[issues-shield]: https://img.shields.io/github/issues/dotgibson/dotfiles-Fedora?style=plastic&logo=github
 [issues-url]: https://github.com/dotgibson/dotfiles-Fedora/issues
-[license-shield]: https://img.shields.io/github/license/dotgibson/dotfiles-Fedora.svg?style=flat-square
+[license-shield]: https://img.shields.io/github/license/dotgibson/dotfiles-Fedora.svg?style=plastic
 [license-url]: https://github.com/dotgibson/dotfiles-Fedora/blob/main/LICENSE
 [docs]: https://dotgibson.github.io/dotfiles-web/docs
-[fedora-shield]: https://img.shields.io/badge/Fedora-51A2DA?style=flat-square&logo=fedora&logoColor=white
+[fedora-shield]: https://img.shields.io/badge/Fedora-51A2DA?style=plastic&logo=fedora&logoColor=white
 [fedora-url]: https://fedoraproject.org
-[dnf-shield]: https://img.shields.io/github/v/release/rpm-software-management/dnf5?style=flat-square&logo=gnometerminal&logoColor=24283B&label=DNF&labelColor=BB9AF7&color=3D59A1
+[dnf-shield]: https://img.shields.io/github/v/release/rpm-software-management/dnf5?style=plastic&logo=gnometerminal&logoColor=24283B&label=DNF&labelColor=BB9AF7&color=3D59A1
 [dnf-url]: https://github.com/rpm-software-management/dnf5
-[rpmfusion-shield]: https://img.shields.io/badge/RPM_Fusion-425265?style=flat-square
+[rpmfusion-shield]: https://img.shields.io/badge/RPM_Fusion-425265?style=plastic
 [rpmfusion-url]: https://rpmfusion.org
-[flatpak-shield]: https://img.shields.io/github/v/release/flatpak/flatpak?style=flat-square&logo=flatpak&logoColor=white&label=Flatpak&labelColor=4A90D9&color=3D59A1
+[flatpak-shield]: https://img.shields.io/github/v/release/flatpak/flatpak?style=plastic&logo=flatpak&logoColor=white&label=Flatpak&labelColor=4A90D9&color=3D59A1
 [flatpak-url]: https://github.com/flatpak/flatpak
-[wayland-shield]: https://img.shields.io/badge/Wayland-FFBC00?style=flat-square&logo=wayland&logoColor=black
+[wayland-shield]: https://img.shields.io/badge/Wayland-FFBC00?style=plastic&logo=wayland&logoColor=black
 [wayland-url]: https://wayland.freedesktop.org
