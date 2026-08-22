@@ -19,8 +19,9 @@ or email <garrettallen2@gmail.com>. Expect an acknowledgement within a few days.
 This repository contains **no secrets, keys, or tokens**, and none should ever be added.
 
 - Runtime secrets come from **1Password** via the `op` CLI (see `core/zsh/50-op.zsh`).
-- **SSH keys are never tracked.** `.gitignore` tracks `ssh/config` and excludes everything
-  else under `ssh/`, plus the usual key/credential filename patterns.
+- **SSH keys are never tracked.** `.gitignore` excludes everything under `ssh/`, plus the
+  usual key/credential filename patterns. Nothing there is tracked at all now — the ssh
+  client config moved into Core as `core/ssh/config` (dotgibson/dotfiles-core#450).
 - Your **git identity** (name/email) is *seeded once* to `~/.config/git/local.gitconfig`
   and edited there — it is never tracked back into this repo.
 - **Push protection and secret scanning are enabled** on this repository. `gitleaks` also
