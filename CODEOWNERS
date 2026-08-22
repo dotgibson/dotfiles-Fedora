@@ -1,15 +1,4 @@
-# CODEOWNERS — dotfiles-Fedora.
-# ──────────────────────────────────────────────────────────────────────────────
-# GitHub resolves CODEOWNERS from the repo ROOT, .github/, or docs/ only — which is
-# why this file has to live here and not in the vendored core/ copy (core/CODEOWNERS
-# governs dotfiles-core, and is inert in this repo).
-#
-# A single catch-all owner is deliberate: this is a personal-but-public showcase
-# system with one author.
+# CODEOWNERS — Core fans out to all eight OS repos via git subtree, so every change
+# here warrants the maintainer's review. A single catch-all owner is deliberate:
+# this is a personal-but-public showcase system with one author.
 * @gerrrt
-
-# The vendored Core subtree is NOT authored here — it is a git-subtree copy of
-# dotgibson/dotfiles-core, overwritten on the next `make sync`. Changes to it should
-# only ever arrive via a sync PR. Ownership is called out explicitly so a review of a
-# core/ diff is always a deliberate act (the core-integrity workflow blocks hand-edits).
-/core/ @gerrrt
