@@ -13,6 +13,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # For packages-check ONLY, and it is the reason that job is worth having. A package
+  # rename or drop upstream breaks this repo's list with NOBODY having edited the repo,
+  # so a gate that fires only on pull_request cannot see the failure it exists to catch —
+  # it would go red on the next unrelated PR, blaming a change that did not cause it.
+  # Core's bootstrap-test.yml recommends pairing packages_check with a schedule for this.
+  schedule:
+    - cron: "17 6 * * 3"
 
 permissions:
   contents: read
@@ -30,3 +37,18 @@ jobs:
       # anywhere. A green run means provision() ran and RETURNED, and wire_links still
       # happened after it — not that provisioning works: nothing is really installed.
       provision_stub: true
+      # Resolve every name in the package list against the real repos, downloading
+      # nothing. This is the blind spot provision_stub cannot cover: it stubs the
+      # package managers, so a WRONG PACKAGE NAME is invisible to it.
+      # `dnf provides`, NOT `dnf info` — this is a CAPABILITY query, and that distinction
+      # is the whole correctness of the gate. bootstrap.sh installs these names with
+      # `dnf install`, which resolves Provides:, so the probe has to ask the same question.
+      # `dnf info` matches package NAMES only, and Fedora 41 retired `wget` in favour of
+      # `wget2` with `wget2-wget` carrying `Provides: wget` — so `dnf install wget` works
+      # while `dnf info wget` fails. Wiring `info` here red-flagged that working package on
+      # the first real run, which is the false-alarm failure this repo cannot afford.
+      # Verified in CI both directions: `bash` and `wget` resolve, a bogus name is REJECTED.
+      # -q only silences output the resolver discards; it does not change the status.
+      packages_check: dnf -q provides
+      # packages_file is left at its default (install/packages.txt) — this repo's list
+      # needs no pre-filtering, unlike dotfiles-Debian's per-distro annotations.
