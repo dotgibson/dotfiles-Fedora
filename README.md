@@ -74,11 +74,11 @@ the [documentation site][docs].
 
 The system is three layers, each building on the one below:
 
-| Layer | Lives in | Owns |
-| --- | --- | --- |
-| **Core** | [`dotfiles-core`](https://github.com/dotgibson/dotfiles-core) → vendored into every OS repo's `core/` | zsh, tmux, nvim, git, starship — identical everywhere |
-| **OS-native** | **this repo** + `dotfiles-{MacBook,Windows,Arch,Debian,openSUSE,Alpine,Gentoo}` | package manager, clipboard, paths |
-| **Role** | `dotfiles-Offense`, `dotfiles-Defense` | offensive / defensive tooling |
+| Layer         | Lives in                                                                                              | Owns                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **Core**      | [`dotfiles-core`](https://github.com/dotgibson/dotfiles-core) → vendored into every OS repo's `core/` | zsh, tmux, nvim, git, starship — identical everywhere |
+| **OS-native** | **this repo** + `dotfiles-{MacBook,Windows,Arch,Debian,openSUSE,Alpine,Gentoo}`                       | package manager, clipboard, paths                     |
+| **Role**      | `dotfiles-Offense`, `dotfiles-Defense`                                                                | offensive / defensive tooling                         |
 
 ### Languages
 
@@ -124,14 +124,14 @@ changes nothing:
 ./bootstrap.sh --dry-run
 ```
 
-| Flag | Effect |
-| --- | --- |
-| `--dry-run` | Print the full plan (packages *and* symlinks); mutate nothing |
-| `--links-only` | Re-link only — no `dnf`, no downloads |
-| `--no-flatpak` | Skip Flathub (recommended on WSL) |
+| Flag                | Effect                                                             |
+| ------------------- | ------------------------------------------------------------------ |
+| `--dry-run`         | Print the full plan (packages *and* symlinks); mutate nothing      |
+| `--links-only`      | Re-link only — no `dnf`, no downloads                              |
+| `--no-flatpak`      | Skip Flathub (recommended on WSL)                                  |
 | `--only` / `--skip` | Restrict wiring to module groups: `zsh nvim tmux git prompt tools` |
-| `--strict` | Exit non-zero if any best-effort step failed |
-| `--force-os` | Allow a Fedora-*like* distro (RHEL/Alma/Rocky/Nobara) |
+| `--strict`          | Exit non-zero if any best-effort step failed                       |
+| `--force-os`        | Allow a Fedora-*like* distro (RHEL/Alma/Rocky/Nobara)              |
 
 It needs root only to install packages, and resolves that once — running as root
 (a container, a WSL first boot) works with no `sudo` installed at all. Existing files

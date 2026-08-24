@@ -27,11 +27,11 @@ Three things enforce this, deliberately overlapping:
 
 ## Which layer does my change belong to?
 
-| If the change… | It belongs in |
-| --- | --- |
-| is identical on every machine (zsh, tmux, nvim, git, starship) | `dotfiles-core` |
-| changes with the **OS** (package manager, clipboard, paths, SELinux) | **here** |
-| changes with the **operator** (offensive/defensive tooling) | `dotfiles-Offense` / `dotfiles-Defense` |
+| If the change…                                                       | It belongs in                           |
+| -------------------------------------------------------------------- | --------------------------------------- |
+| is identical on every machine (zsh, tmux, nvim, git, starship)       | `dotfiles-core`                         |
+| changes with the **OS** (package manager, clipboard, paths, SELinux) | **here**                                |
+| changes with the **operator** (offensive/defensive tooling)          | `dotfiles-Offense` / `dotfiles-Defense` |
 
 Structural changes to the OS-native layout **start here** and propagate per
 [`core/PORTING-MATRIX.md`](core/PORTING-MATRIX.md). If your fix to `bootstrap.sh` would
