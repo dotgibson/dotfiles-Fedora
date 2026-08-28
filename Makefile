@@ -11,7 +11,7 @@
 # The vendored core/ is excluded from every check here: it is gated upstream.
 # ──────────────────────────────────────────────────────────────────────────────
 .DEFAULT_GOAL := help
-.PHONY: help lint shellcheck syntax zsh-syntax markdown check dry-run links-only integrity hooks clean
+.PHONY: help lint shellcheck syntax zsh-syntax markdown check dry-run links-only integrity hooks clean capabilities
 
 # Repo-owned shell only — core/ is gated upstream. Mirrors the reusable gate's
 # `git ls-files '*.sh' ':!:core/**'`.
@@ -23,7 +23,7 @@ help: ## Show this help
 	@grep -E '^[a-z][a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) \
 		| sed -E 's/:.*## /\t/' | sort | awk -F'\t' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-lint: shellcheck syntax zsh-syntax ## The gate: shellcheck + bash -n + zsh -n (what CI runs)
+lint: shellcheck syntax zsh-syntax capabilities ## The gate: shellcheck + bash -n + zsh -n (what CI runs)
 	@printf '\033[32m✓\033[0m lint clean\n'
 
 shellcheck: ## ShellCheck the repo-owned bash (excludes the vendored core/)
@@ -89,3 +89,23 @@ hooks: ## Install the pre-commit hooks into this clone
 
 clean: ## Remove local scratch artifacts (never touches tracked files)
 	@find . -name '*.pre-dotfiles.*' -maxdepth 2 -print -delete 2>/dev/null || true
+
+# ── the OS capability declaration (Core v5, #663/#667) ────────────────────────
+# ONE definition of the schema gates all seven declaring repos: the validator is
+# core/scripts/check-capabilities.sh, vendored with Core, so a schema change arrives
+# with the next sync instead of needing seven hand-written greps to be updated in
+# step. Core's own `make audit` runs the same script over its shipped example and
+# sweeps the fleet for these files; this is the local half of that gate.
+#
+# The glob is guarded because an unmatched glob stays LITERAL in sh — without the
+# test this would "validate" a file named `os/*.capabilities` and pass on nothing,
+# which is the failure mode a gate must never have.
+capabilities: ## Validate os/*.capabilities against Core's schema
+	@rc=0; found=0; \
+	for f in os/*.capabilities; do \
+	  [ -e "$$f" ] || continue; found=1; \
+	  core/scripts/check-capabilities.sh "$$f" --packages install/packages.txt || rc=1; \
+	done; \
+	if [ "$$found" -eq 0 ]; then echo "!! no os/*.capabilities — this repo must declare one (see core/examples/os.capabilities.example)"; rc=1; fi; \
+	exit $$rc
+
