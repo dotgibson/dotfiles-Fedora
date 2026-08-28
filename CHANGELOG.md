@@ -53,6 +53,16 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Added
 
+- **`os/fedora.capabilities`** — this repo's Core v5 capability declaration
+  (dotgibson/dotfiles-core#663, #667). Core's `up`, maint runner and `core-doctor` now
+  dispatch through it rather than through package-manager branches inside portable Core
+  modules. Fedora is the repo `core/examples/os.capabilities.example` was written from,
+  so this is that example made real. `MAINT_UNATTENDED_UPGRADE=1` — a versioned,
+  non-rolling distro whose stable updates are what an unattended nightly is for, and what
+  this box already did; the operator's `MAINT_SYSTEM_UPGRADE=1` is still the first of the
+  two gates.
+- **`make capabilities`** — validates `os/*.capabilities` against Core's schema via the
+  vendored `core/scripts/check-capabilities.sh`, and runs as part of `make lint`.
 - `bootstrap.sh --dry-run` — previews the whole plan (packages *and* the symlink graph)
   and changes nothing, via the shared lib's `BLIB_DRY`; prints the wiring tally.
 - `bootstrap.sh --strict` and `--force-os`; a preflight that checks for the commands the
