@@ -4,7 +4,7 @@
 # of here. Two different reasons, so don't collapse them back into one line:
 #   starship, yazi — genuinely absent from every current Fedora release; the
 #     upstream installer (starship) / cargo (yazi) is the only automatic path.
-#   atuin — IS packaged now (F43 and rawhide carry 18.12.1, F44 only 18.11.0), but
+#   atuin — IS packaged now (F43/F45/rawhide carry 18.12.1, F44 only 18.11.0), but
 #     Fedora trails upstream 18.19.0, and 18.19.0 is the exact client
 #     core/PORTING-MATRIX.md's atuin²⁰ note validated the daemon config-precedence
 #     behavior against. Taking the RPM would swap a known-good atuin for an
@@ -16,7 +16,7 @@
 zsh
 tmux
 
-# ── modern CLI core (all in Fedora repos as of F40+) ──────────
+# ── modern CLI core (in Fedora repos; see per-entry notes) ────
 eza            # ls
 bat            # cat
 fd-find        # find  (binary: fd on Fedora, not fdfind)
@@ -29,7 +29,7 @@ tealdeer       # tldr (fast Rust client; binary: tldr) — ORPHANED, last built 
                # F45/rawhide(F46) build. Kept here for F43/F44; bootstrap.sh
                # cargo-installs it wherever dnf no longer resolves the name.
 
-# ── modern CLI extras (core-doctor probes these; all in Fedora repos) ─
+# ── modern CLI extras (core-doctor probes these; see per-entry notes) ─
 duf            # df   (disk usage/free)
 procs          # ps — ORPHANED, last built F44; no F45/rawhide(F46) build. Same deal as
                # tealdeer above: kept for F43/F44, cargo fallback covers F45+.
@@ -75,7 +75,7 @@ cargo          # rust toolchain -> backstops every `cargo install` in bootstrap.
 python3-neovim # pynvim — the Python 3 provider module
 python3-pip    # pip for the system python
 tree-sitter-cli # nvim-treesitter (main branch) compiles parsers locally — needs the CLI ≥0.26.1.
-                # F44 and rawhide ship 0.26.11 and clear that floor; F43 ships 0.25.10 and does
+                # F44/F45/rawhide ship 0.26.11 and clear that floor; F43 ships 0.25.10 and does
                 # NOT — on F43 the packaged CLI is too old for the main branch.
                 # If :checkhealth nvim-treesitter flags it as too old, drop it from this list and
                 # install current via mise (`mise use -g tree-sitter`) or `cargo install tree-sitter-cli`.

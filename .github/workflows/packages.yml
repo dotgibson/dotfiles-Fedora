@@ -59,6 +59,12 @@ jobs:
           # to add a cargo/go fallback in bootstrap.sh BEFORE the next Fedora ships.
           - release: "rawhide"
             blocking: false
+          # F45 branched from rawhide 2026-08-11; GA 2026-10-20, at which point it
+          # becomes supported and F43 goes EOL. Advisory until then — tealdeer and
+          # procs genuinely do not resolve here and that is expected, not a break.
+          # Flip blocking:true at GA, when a miss here is a real break for someone.
+          - release: "45"
+            blocking: false
     container:
       image: fedora:${{ matrix.release }}
     steps:
@@ -115,4 +121,4 @@ jobs:
             echo "::error::${#missing[@]} package(s) do not resolve on Fedora $RELEASE: ${missing[*]}"
             exit 1
           fi
-          echo "::warning::${#missing[@]} package(s) do not resolve on rawhide: ${missing[*]} — add a fallback before this reaches a stable release"
+          echo "::warning::${#missing[@]} package(s) do not resolve on Fedora $RELEASE: ${missing[*]} — add a fallback before this reaches a stable release"
