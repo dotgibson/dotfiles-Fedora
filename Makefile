@@ -17,6 +17,9 @@
 # `git ls-files '*.sh' ':!:core/**'`.
 SH_FILES  := $(shell git ls-files '*.sh' ':!:core/**' 2>/dev/null)
 ZSH_FILES := $(shell git ls-files '*.zsh' ':!:core/**' 2>/dev/null)
+# Same pathspec the reusable gate's markdown leg uses, so `make markdown` scans exactly
+# what CI scans — including the .github/ files a top-level '*.md' glob never saw.
+MD_FILES  := $(shell git ls-files '*.md' ':!:core/**' 2>/dev/null)
 
 help: ## Show this help
 	@echo "dotfiles-Fedora — make targets:"
@@ -40,14 +43,26 @@ syntax: ## bash -n the repo-owned bash, and check --help still works
 	@bash bootstrap.sh --help >/dev/null || { echo "bootstrap.sh --help failed"; exit 1; }
 
 zsh-syntax: ## zsh -n the repo-owned zsh modules (shellcheck has no zsh mode)
-	@command -v zsh >/dev/null 2>&1 || { echo "zsh not installed — skipping"; exit 0; }
-	@test -n "$(ZSH_FILES)" || { echo "no repo-owned .zsh"; exit 0; }
-	@for f in $(ZSH_FILES); do echo "zsh -n $$f"; zsh -n "$$f" || exit 1; done
+	@# ONE recipe line, deliberately. make runs each line in its own shell, so the
+	@# `exit 0` in a multi-line version only ends THAT line — the guard printed
+	@# "skipping" and then the next line ran `zsh -n` anyway and failed. Joining them
+	@# makes the skip a real skip.
+	@if ! command -v zsh >/dev/null 2>&1; then echo "zsh not installed — skipping"; \
+	elif test -z "$(ZSH_FILES)"; then echo "no repo-owned .zsh"; \
+	else for f in $(ZSH_FILES); do echo "zsh -n $$f"; zsh -n "$$f" || exit 1; done; fi
 
 markdown: ## markdownlint the repo-owned docs (shares .markdownlint.jsonc with Core)
-	@command -v markdownlint-cli2 >/dev/null 2>&1 \
-		|| { echo "markdownlint-cli2 not installed: npm i -g markdownlint-cli2 — skipping"; exit 0; }
-	@markdownlint-cli2 '*.md' '!core/**'
+	@# Same one-line reason as zsh-syntax above.
+	@#
+	@# The file list is `git ls-files`, not a `'*.md'` glob, to match what the gate
+	@# actually scans: lint-call.yml's markdown leg has been BLOCKING since dotfiles-core#592
+	@# and lints `git ls-files '*.md' ':!:core/**'` — which is recursive. The glob was
+	@# top-level only, so the three .github/ markdown files were CI-enforced and locally
+	@# invisible, and this target could read green against a red required check.
+	@if ! command -v markdownlint-cli2 >/dev/null 2>&1; then \
+	  echo "markdownlint-cli2 not installed: npm i -g markdownlint-cli2 — skipping"; \
+	elif test -z "$(MD_FILES)"; then echo "no repo-owned .md"; \
+	else echo "markdownlint-cli2 $(MD_FILES)"; markdownlint-cli2 $(MD_FILES); fi
 
 dry-run: ## Preview the FULL bootstrap plan (packages + symlinks); changes nothing
 	@./bootstrap.sh --dry-run

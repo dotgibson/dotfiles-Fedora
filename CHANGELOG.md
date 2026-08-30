@@ -13,6 +13,24 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Fixed
 
+- **`make zsh-syntax` and `make markdown` announced a skip and then ran anyway.** Each
+  `make` recipe line runs in its own shell, so each guard's `exit 0` only ended that
+  line: with `zsh` absent, `zsh-syntax` printed "zsh not installed — skipping" and then
+  ran `zsh -n` (`Error 1`); with no global `markdownlint-cli2`, `markdown` printed its
+  own skip and then ran the linter (`Error 127`). Both collapsed into one recipe line, so
+  a skip is a real skip. This is the defect `dotfiles-Debian` recorded and fixed for its
+  `zsh-syntax`, noting the shape survived in the other OS repos' Makefiles — this is that
+  repo, and it had both (dotgibson/dotfiles-core#775).
+- **`make markdown` also scanned the wrong files.** It globbed `'*.md'`, which is
+  top-level only, while the reusable gate's markdown leg — **blocking** since
+  dotgibson/dotfiles-core#592 — lints `git ls-files '*.md' ':!:core/**'`, recursively. The
+  three `.github/` markdown files were therefore enforced by a required check and
+  invisible locally, so this target could read green against a red PR. Now uses the same
+  pathspec via a new `MD_FILES`. All nine files lint clean, so nothing was hiding.
+- `.markdownlint.jsonc`'s header claimed the rules were "mirrored from Core rather than
+  CI-enforced" and that "lint.yml skips `**.md` entirely". Both were true when written and
+  neither survived dotgibson/dotfiles-core#592.
+
 - **`bootstrap.sh` no longer fails on a machine without `sudo`.** The escalator is now
   resolved once (`BLIB_SU`: empty as root, else `sudo`, else `doas`) and used everywhere,
   instead of a hard-coded `sudo` at a dozen call sites. A container, a WSL first boot, or
