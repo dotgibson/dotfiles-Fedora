@@ -5,8 +5,9 @@ for package installs, and fetches software from the internet. That makes its **t
 decisions** part of its security surface, so they are written down here rather than left
 implicit in the script.
 
-GitHub resolves `SECURITY.md` from the repo root, `.github/`, or `docs/` — the vendored
-`core/SECURITY.md` governs `dotfiles-core` and is inert here.
+GitHub resolves `SECURITY.md` from the repo root, `.github/`, or `docs/`, so this file
+is the one it shows. Core's own [`SECURITY.md`](https://github.com/dotgibson/dotfiles-core/blob/main/SECURITY.md) governs
+`dotfiles-core`, not this repo.
 
 ## Reporting a vulnerability
 
@@ -62,7 +63,8 @@ Recorded honestly rather than papered over:
    `dnf upgrade` nor a later bootstrap moves it (the presence guard skips the block once
    the binary exists). Check `carapace --version` occasionally.
 3. **Reusable workflows are pinned to the moving `@v4` tag**, not a commit SHA. This is
-   the documented fleet policy (`core/RELEASE-STRATEGY.md`): a caller's contract then
+   the documented fleet policy
+   ([`RELEASE-STRATEGY.md`](https://github.com/dotgibson/dotfiles-core/blob/main/RELEASE-STRATEGY.md)): a caller's contract then
    changes only via a Core *release*. All workflows are first-party (`dotgibson/*`), and
    third-party actions inside them (`actions/checkout`, `actions/cache`) *are* SHA-pinned.
 
