@@ -151,8 +151,8 @@ prompt — comes from vendored Core; this repo owns the Fedora specifics:
 - `os/fedora.zsh` — clipboard + package-manager aliases → `~/.config/zsh/80-os.zsh`
 - `os/fedora.conf` / `os/fedora.gitconfig` — the tmux + git OS overlays
 - `wsl/wsl.conf` — the WSL boot config (systemd, default user, interop)
-- `aliases.md` — the Fedora alias cheat sheet ([`core/aliases.md`](core/aliases.md) covers
-  the universal ones)
+- `aliases.md` — the Fedora alias cheat sheet (dotfiles-core's
+  [`aliases.md`](https://github.com/dotgibson/dotfiles-core/blob/main/aliases.md) covers the universal ones)
 - `core/` — vendored from `dotfiles-core` (read-only here; edit upstream)
 
 The things that actually bite on Fedora — dnf5, RPM Fusion, the Wayland clipboard
