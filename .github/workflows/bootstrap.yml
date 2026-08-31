@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   test:
-    uses: dotgibson/dotfiles-core/.github/workflows/bootstrap-test.yml@v5
+    uses: dotgibson/dotfiles-core/.github/workflows/bootstrap-test.yml@v6
     with:
       image: fedora:latest
       prep: "dnf install -y -q bash zsh"
