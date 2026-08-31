@@ -5,8 +5,9 @@ template the other Linux repos are stamped from. The contribution rules are ther
 mostly *boundary* rules: the hard part is not writing the change, it is knowing which
 repo it belongs in.
 
-GitHub resolves `CONTRIBUTING.md` from the repo root, `.github/`, or `docs/` — the
-vendored `core/CONTRIBUTING.md` governs `dotfiles-core` and is inert here.
+GitHub resolves `CONTRIBUTING.md` from the repo root, `.github/`, or `docs/`, so this
+file is the one it shows. Core's own
+[`CONTRIBUTING.md`](https://github.com/dotgibson/dotfiles-core/blob/main/CONTRIBUTING.md) governs `dotfiles-core`, not this repo.
 
 ## The rule that bites: never hand-edit `core/`
 
