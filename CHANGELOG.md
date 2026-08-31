@@ -2,8 +2,8 @@
 
 All notable changes to **dotfiles-Fedora** (the OS-native layer) are recorded here.
 Changes to the vendored `core/` subtree are *not* listed individually — they arrive as
-Core releases; see [`core/CHANGELOG.md`](core/CHANGELOG.md) and the `core_version` in
-[`core.lock`](core.lock).
+Core releases; see [dotfiles-core's CHANGELOG](https://github.com/dotgibson/dotfiles-core/blob/main/CHANGELOG.md) and the
+`core_version` in [`core.lock`](core.lock).
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project uses [Conventional Commits](https://www.conventionalcommits.org/). Release tags
