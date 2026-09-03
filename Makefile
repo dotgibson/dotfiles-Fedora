@@ -11,7 +11,7 @@
 # The vendored core/ is excluded from every check here: it is gated upstream.
 # ──────────────────────────────────────────────────────────────────────────────
 .DEFAULT_GOAL := help
-.PHONY: help lint shellcheck syntax zsh-syntax markdown check dry-run links-only integrity hooks clean capabilities
+.PHONY: help lint shellcheck syntax zsh-syntax markdown check dry-run links-only packages-check core-verify integrity hooks clean capabilities
 
 # Repo-owned shell only — core/ is gated upstream. Mirrors the reusable gate's
 # `git ls-files '*.sh' ':!:core/**'`.
@@ -24,7 +24,7 @@ MD_FILES  := $(shell git ls-files '*.md' ':!:core/**' 2>/dev/null)
 help: ## Show this help
 	@echo "dotfiles-Fedora — make targets:"
 	@grep -E '^[a-z][a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) \
-		| sed -E 's/:.*## /\t/' | sort | awk -F'\t' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+		| sed -E 's/:.*## /\t/' | sort | awk -F'\t' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 lint: shellcheck syntax zsh-syntax capabilities ## The gate: shellcheck + bash -n + zsh -n (what CI runs)
 	@printf '\033[32m✓\033[0m lint clean\n'
@@ -70,6 +70,42 @@ dry-run: ## Preview the FULL bootstrap plan (packages + symlinks); changes nothi
 links-only: ## Re-wire the symlinks on THIS machine (no dnf, no downloads)
 	@./bootstrap.sh --links-only
 
+# ── the canonical fleet verbs (dotgibson/dotfiles-core#691) ───────────────────
+# `packages-check` and `core-verify` are two of the seven names every repo that vendors
+# Core must answer to (Core's scripts/make-vocabulary.txt; the register that checks it is
+# `make fleet-vocabulary` there). Before that list, "verify core" had five spellings across
+# nine repos and only `help` was common to every Makefile — a contributor re-learned the
+# verbs in each repo and no gate noticed. The requirement is that the CANONICAL name
+# exists, not that a historical one dies, so `integrity` below stays as an alias.
+
+packages-check: ## Do all install/packages.txt names still resolve against dnf?
+	@# The local half of the question two CI legs already ask — bootstrap.yml's
+	@# `packages_check: dnf -q provides` and packages.yml's per-release matrix, both in a
+	@# Fedora container. This runs against whatever dnf is in front of you: on a Fedora box
+	@# it is the same answer, and off one it says so and STOPS rather than reporting a green
+	@# it did not earn. The authoritative answer is per-release and lives in CI.
+	@#
+	@# `dnf provides`, NOT `dnf info`. bootstrap.sh installs these names with `dnf install`,
+	@# which resolves `Provides:`, so the probe has to ask the same question. F41 retired
+	@# `wget` in favour of wget2-wget carrying `Provides: wget` — `dnf install wget` works
+	@# while `dnf info wget` fails, so a name-only probe red-flags a working package. That
+	@# false alarm is the exact reason bootstrap.yml spells it `provides`; do not "fix" it.
+	@command -v dnf >/dev/null 2>&1 || { echo "dnf not found — run this on Fedora (CI covers every supported release: .github/workflows/packages.yml)"; exit 1; }
+	@set -e; \
+	. core/lib/bootstrap-lib.sh; \
+	pkgs=$$(blib_read_pkgs install/packages.txt); \
+	[ -n "$$pkgs" ] || { echo "no packages parsed from install/packages.txt"; exit 1; }; \
+	echo ":: resolving $$(echo "$$pkgs" | wc -l) package names (no download, no install)"; \
+	rc=0; \
+	for p in $$pkgs; do \
+	  dnf -q provides "$$p" >/dev/null 2>&1 || { echo "  UNRESOLVED: $$p"; rc=1; }; \
+	done; \
+	if [ $$rc -eq 0 ]; then printf '\033[32m✓\033[0m all package names resolve\n'; else \
+	  echo "^^ renamed, orphaned or retired upstream — each needs a rename in install/packages.txt"; \
+	  echo "   or a presence-guarded cargo/go fallback in bootstrap.sh (the pattern already used"; \
+	  echo "   for sd, gron, dust, xh, viddy, tealdeer and procs)"; fi; \
+	exit $$rc
+
 check: lint ## lint + a hermetic --links-only run against a throwaway HOME
 	@tmp=$$(mktemp -d); \
 	mkdir -p "$$tmp/.config/tmux/plugins/tpm"; \
@@ -88,7 +124,7 @@ check: lint ## lint + a hermetic --links-only run against a throwaway HOME
 	rm -rf "$$tmp"; \
 	test $$rc -eq 0 && printf '\033[32m✓\033[0m symlink graph OK\n' || exit 1
 
-integrity: ## Verify the vendored core/ is pristine vs core.lock (needs a sibling dotfiles-core)
+core-verify: ## Verify the vendored core/ is pristine vs core.lock (needs a sibling dotfiles-core)
 	@ref=../dotfiles-core; \
 	test -d "$$ref" || { echo "needs a sibling clone of dotfiles-core at $$ref"; echo "(the core_sha in core.lock only resolves in Core's object store — see core.lock)"; exit 1; }; \
 	git -C "$$ref" cat-file -e "$$(sed -n 's/^core_sha=//p' core.lock)" 2>/dev/null || { \
@@ -96,6 +132,11 @@ integrity: ## Verify the vendored core/ is pristine vs core.lock (needs a siblin
 	  echo "   UNVERIFIABLE, which reads like tampering but only means 'fetch Core')"; \
 	  git -C "$$ref" fetch --quiet origin || true; }; \
 	"$$ref/scripts/core-integrity.sh" --self "$(CURDIR)"
+
+# This repo's historical spelling for the target above, kept so anything that already
+# calls it — muscle memory, a local script, a runbook line — keeps working. Two lines is
+# the whole cost of not breaking those; see the vocabulary note at `packages-check`.
+integrity: core-verify ## (alias) the pre-#691 spelling of core-verify
 
 hooks: ## Install the pre-commit hooks into this clone
 	@command -v pre-commit >/dev/null 2>&1 || { echo "pre-commit not installed: pip install pre-commit"; exit 1; }

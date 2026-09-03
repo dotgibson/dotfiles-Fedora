@@ -42,12 +42,21 @@ be identical on Arch and openSUSE, that is a strong signal it belongs in
 ## Local development
 
 ```bash
-make help          # list every target
-make lint          # shellcheck + bash -n + zsh -n, exactly as CI runs them
-make check         # lint + a hermetic --links-only run in a throwaway HOME
-make dry-run       # preview the full bootstrap plan; changes nothing
-make hooks         # install the pre-commit hooks (needs `pre-commit`)
+make help            # list every target
+make lint            # shellcheck + bash -n + zsh -n, exactly as CI runs them
+make check           # lint + a hermetic --links-only run in a throwaway HOME
+make dry-run         # preview the full bootstrap plan; changes nothing
+make packages-check  # do all install/packages.txt names still resolve? (needs dnf)
+make core-verify     # is the vendored core/ pristine vs core.lock?
+make hooks           # install the pre-commit hooks (needs `pre-commit`)
 ```
+
+`lint`, `check`, `dry-run`, `packages-check` and `core-verify` are five of the seven
+canonical verbs every repo that vendors Core answers to (`help` and `test` are the other
+two). The list is declared once, in `dotfiles-core`'s `scripts/make-vocabulary.txt`, so a
+target means the same thing in every repo in the fleet — see
+[dotgibson/dotfiles-core#691](https://github.com/dotgibson/dotfiles-core/issues/691).
+`integrity` is kept as an alias of `core-verify`; nothing that already calls it breaks.
 
 `make lint` is the gate. Green it before you push — CI runs the same checks via the
 reusable workflow in `dotfiles-core`, plus `actionlint` on the workflows.

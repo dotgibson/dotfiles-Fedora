@@ -11,6 +11,33 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ## [Unreleased]
 
+### Added
+
+- **The canonical fleet `make` verbs: `packages-check` and `core-verify`
+  (dotgibson/dotfiles-core#691).** Nine repos had nine dialects — "verify core" had five
+  spellings across the fleet, "dry run" two, and only `help` was common to every
+  Makefile, so a contributor moving between repos re-learned the verbs each time and no
+  gate noticed. `dotfiles-core`'s `scripts/make-vocabulary.txt` now declares the seven
+  names once (`help`, `lint`, `check`, `dry-run`, `packages-check`, `core-verify`,
+  `test`) and its `make fleet-vocabulary` register reports, per repo, which resolve.
+  This repo was missing two.
+  - `packages-check` resolves every `install/packages.txt` name against `dnf` locally —
+    the same question `bootstrap.yml`'s `packages_check` leg and `packages.yml`'s
+    per-release matrix ask in a container, now answerable before you push. It probes
+    with `dnf provides`, not `dnf info`, for the reason `bootstrap.yml` records: F41
+    retired `wget` in favour of `wget2-wget` carrying `Provides: wget`, so
+    `dnf install wget` works while `dnf info wget` fails, and a name-only probe would
+    red-flag a working package. Off Fedora it exits 1 saying so rather than reporting a
+    green it did not earn.
+  - `core-verify` is the canonical name for what this repo spelled `integrity`. The
+    target is unchanged; `integrity` remains as a two-line alias, so anything already
+    calling it — muscle memory, a local script, a runbook line — keeps working. The
+    requirement is that the canonical name *exists*, not that the old one dies.
+  - `make test` is the one verb still missing here: it needs a repo-owned suite, which
+    this repo does not yet have. That is the other half of dotgibson/dotfiles-core#691
+    (the test floor) and lands separately — it matters most in *this* repo, which
+    `PORTING-MATRIX.md` names as the template every Linux repo is copied from.
+
 ### Fixed
 
 - **`make zsh-syntax` and `make markdown` announced a skip and then ran anyway.** Each
