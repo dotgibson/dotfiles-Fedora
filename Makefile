@@ -11,7 +11,8 @@
 # The vendored core/ is excluded from every check here: it is gated upstream.
 # ──────────────────────────────────────────────────────────────────────────────
 .DEFAULT_GOAL := help
-.PHONY: help lint shellcheck syntax zsh-syntax markdown check dry-run links-only integrity hooks clean capabilities
+.PHONY: help lint shellcheck syntax zsh-syntax markdown check dry-run links-only \
+        packages-check core-verify integrity test hooks clean capabilities
 
 # Repo-owned shell only — core/ is gated upstream. Mirrors the reusable gate's
 # `git ls-files '*.sh' ':!:core/**'`.
@@ -88,7 +89,14 @@ check: lint ## lint + a hermetic --links-only run against a throwaway HOME
 	rm -rf "$$tmp"; \
 	test $$rc -eq 0 && printf '\033[32m✓\033[0m symlink graph OK\n' || exit 1
 
-integrity: ## Verify the vendored core/ is pristine vs core.lock (needs a sibling dotfiles-core)
+# ── the fleet Makefile vocabulary (Core #691) ─────────────────────────────────
+# core/scripts/make-vocabulary.txt declares one canonical name per verb across every OS
+# repo. The requirement is that the canonical name EXISTS — a repo keeps its historical
+# spelling as a .PHONY alias, so muscle memory survives (`make integrity` still works).
+packages-check: ## Do all install/packages.txt names still resolve on this Fedora?
+	@./test/check-packages.sh install/packages.txt
+
+core-verify: ## Verify the vendored core/ is pristine vs core.lock (needs a sibling dotfiles-core)
 	@ref=../dotfiles-core; \
 	test -d "$$ref" || { echo "needs a sibling clone of dotfiles-core at $$ref"; echo "(the core_sha in core.lock only resolves in Core's object store — see core.lock)"; exit 1; }; \
 	git -C "$$ref" cat-file -e "$$(sed -n 's/^core_sha=//p' core.lock)" 2>/dev/null || { \
@@ -96,6 +104,11 @@ integrity: ## Verify the vendored core/ is pristine vs core.lock (needs a siblin
 	  echo "   UNVERIFIABLE, which reads like tampering but only means 'fetch Core')"; \
 	  git -C "$$ref" fetch --quiet origin || true; }; \
 	"$$ref/scripts/core-integrity.sh" --self "$(CURDIR)"
+
+integrity: core-verify ## (alias) kept for muscle memory — the canonical name is core-verify
+
+test: ## Run this repo's behavioural checks (the fleet test floor)
+	@./test/check-packages.sh install/packages.txt
 
 hooks: ## Install the pre-commit hooks into this clone
 	@command -v pre-commit >/dev/null 2>&1 || { echo "pre-commit not installed: pip install pre-commit"; exit 1; }

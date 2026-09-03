@@ -80,45 +80,8 @@ jobs:
         env:
           BLOCKING: ${{ matrix.blocking }}
           RELEASE: ${{ matrix.release }}
-        run: |
-          set -uo pipefail
-          # Same parse as bootstrap.sh's blib_read_pkgs: strip #-comments and all
-          # whitespace (package names contain none), drop blanks.
-          mapfile -t pkgs < <(sed 's/#.*//' install/packages.txt | tr -d '[:blank:]' | grep -v '^$')
-          echo "::notice::checking ${#pkgs[@]} package names on Fedora $RELEASE"
-          missing=()
-          for p in "${pkgs[@]}"; do
-            # Two probes, because a plain repoquery misses VIRTUAL capabilities: on F42+
-            # there is no package literally named `wget` — it is a capability whose default
-            # provider is wget2-wget. --whatprovides is what resolves that, and it is the
-            # same resolution `dnf install` itself performs.
-            if [ -n "$(dnf repoquery --qf '%{name}' "$p" 2>/dev/null)" ]; then
-              continue
-            fi
-            if [ -n "$(dnf repoquery --whatprovides "$p" --qf '%{name}' 2>/dev/null)" ]; then
-              echo "  $p -> provided virtually"
-              continue
-            fi
-            missing+=("$p")
-          done
-
-          if [ ${#missing[@]} -eq 0 ]; then
-            echo "all ${#pkgs[@]} names resolve on Fedora $RELEASE"
-            exit 0
-          fi
-
-          {
-            echo "### Unresolvable on Fedora $RELEASE"
-            echo
-            for m in "${missing[@]}"; do echo "- \`$m\`"; done
-            echo
-            echo "Each needs either a rename in \`install/packages.txt\` or a presence-guarded"
-            echo "cargo/go fallback in \`bootstrap.sh\` (the pattern already used for"
-            echo "\`sd\`, \`gron\`, \`dust\`, \`xh\`, \`viddy\`, \`tealdeer\` and \`procs\`)."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$BLOCKING" = "true" ]; then
-            echo "::error::${#missing[@]} package(s) do not resolve on Fedora $RELEASE: ${missing[*]}"
-            exit 1
-          fi
-          echo "::warning::${#missing[@]} package(s) do not resolve on Fedora $RELEASE: ${missing[*]} — add a fallback before this reaches a stable release"
+        # Same probe pair (name + --whatprovides), same parse, same STEP_SUMMARY, same
+        # blocking/advisory split — the shell used to be inline here and is now the
+        # test-floor script, so `make test` locally exercises exactly what CI does. See
+        # the two-probe rationale in the script's header (wget → wget2-wget on F42+).
+        run: ./test/check-packages.sh install/packages.txt
