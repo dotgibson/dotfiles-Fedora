@@ -96,10 +96,14 @@ fi
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
     printf '### Unresolvable on Fedora %s\n\n' "${release:-unknown}"
+    # shellcheck disable=SC2016  # backticks in a quoted format string are literal markdown, not command substitutions
     for m in "${missing[@]}"; do printf -- '- `%s`\n' "$m"; done
-    printf '\nEach needs either a rename in `install/packages.txt` or a presence-guarded\n'
-    printf 'cargo/go fallback in `bootstrap.sh` (the pattern already used for\n'
-    printf '`sd`, `gron`, `dust`, `xh`, `viddy`, `tealdeer` and `procs`).\n'
+    cat <<'MD'
+
+Each needs either a rename in `install/packages.txt` or a presence-guarded
+cargo/go fallback in `bootstrap.sh` (the pattern already used for
+`sd`, `gron`, `dust`, `xh`, `viddy`, `tealdeer` and `procs`).
+MD
   } >> "$GITHUB_STEP_SUMMARY"
 fi
 
