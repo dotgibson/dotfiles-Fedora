@@ -27,7 +27,9 @@
 # (.github/workflows/packages.yml) in a pinned Fedora container per release; locally this
 # is a smoke test against whatever release you happen to track, which is why the release
 # in view is printed. On a non-Fedora host this skips cleanly (exit 0) rather than red —
-# a Debian dev box cannot answer the question and should not pretend to.
+# a Debian dev box cannot answer the question and should not pretend to, and neither can
+# a RHEL/CentOS/Rocky box whose dnf resolves against a different archive (see the
+# /etc/os-release ID/ID_LIKE guard below).
 #
 # Exit codes:
 #   0  every name resolved (or a clean skip: no dnf here, or BLOCKING=false on a red)
@@ -59,6 +61,23 @@ command -v dnf >/dev/null 2>&1 || {
   say "no dnf on this host — skipping (run .github/workflows/packages.yml for the real answer)"
   exit 0
 }
+
+# Presence of `dnf` is necessary but not sufficient: RHEL, CentOS Stream, Rocky, Alma and
+# Amazon Linux all ship dnf against DIFFERENT repos. Running these probes there would
+# label the result "Fedora <VERSION_ID>" and flag names that only Fedora carries (RPM
+# Fusion, COPR-only tools) as broken — a real Fedora question answered against the wrong
+# archive. Skip unless ID or ID_LIKE names fedora.
+if [ -r /etc/os-release ]; then
+  # shellcheck source=/etc/os-release
+  . /etc/os-release
+  case " ${ID:-} ${ID_LIKE:-} " in
+  *" fedora "*) : ;;
+  *)
+    say "dnf present but this is ${ID:-unknown} (not Fedora / fedora-derived) — skipping"
+    exit 0
+    ;;
+  esac
+fi
 
 manifest="${1:-install/packages.txt}"
 [[ -f "$manifest" ]] || { bad "manifest not found: $manifest"; exit 1; }
