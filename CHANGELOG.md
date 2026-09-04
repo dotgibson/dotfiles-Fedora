@@ -13,6 +13,19 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Fixed
 
+- **`bootstrap.sh`'s `PATH` is not the shell's `PATH` — adopt `blib_user_bindirs_on_path`**
+  (dotgibson/dotfiles-core#748). Replaces the hand-rolled `export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.atuin/bin:$PATH"` prelude. `~/.local/bin`, `~/.cargo/bin` and `$GOBIN` reach
+  `PATH` only through the zsh layer, i.e. only inside a Core shell — which does not exist
+  while `bootstrap.sh` runs. So every `command -v <tool>` guard here was answered by the
+  PATH of whatever shell launched the bootstrap: on a fresh box, bash, with none of them.
+  That is wasted work when the guard picks whether to reinstall, and a **wrong answer** when
+  it picks a branch — `dotfiles-openSUSE` probed `command -v mise` for a mise `mise.run` had
+  written to `~/.local/bin` moments earlier, both arms of its Go fallback missed, and the run
+  exited 2 on every bootstrap. No stubbed CI leg can see that: a stub installs nothing, so
+  "is the tool present afterwards" can never fail under one. Core has shipped
+  `blib_user_bindirs_on_path` for exactly this since dotgibson/dotfiles-core#425 — it resolves
+  `CARGO_HOME` and `GOBIN`/`GOPATH` rather than hard-coding them, and adds only directories
+  that **exist**, so it is called again after an installer creates one. A second call now runs after the `mise.run` install, so `_dotfiles_go_install`'s `command -v mise` arm sees the mise this script just installed.
 - **`make check` was not hermetic, and wrote Core into your real config dir
   (dotgibson/dotfiles-core#852).** The target promises "a hermetic `--links-only` run
   against a throwaway HOME" and redirected only `HOME` — but `bootstrap.sh` resolves its
