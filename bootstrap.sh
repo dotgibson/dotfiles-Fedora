@@ -255,7 +255,28 @@ provision() {
   # and under the old >/dev/null 2>&1 it looked like a hang. The atuin block below already
   # documents this exact trap ("Gate on the DESTINATION, never on `command -v atuin`");
   # this makes the same truth available to every other guard at once.
-  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.atuin/bin:$PATH"
+  #
+  # Core's helper, NOT the hand-rolled `export PATH=` this used to be. The literal four-dir
+  # list was a fork of core/lib/bootstrap-lib.sh :: blib_user_bindirs_on_path, which does
+  # the same job and does two things the fork could not: it resolves CARGO_HOME and
+  # GOBIN/GOPATH instead of hard-coding ~/.cargo and ~/.local, so a box with either set
+  # elsewhere stops silently rebuilding its tools every run; and it adds only directories
+  # that EXIST, so a bogus entry can never be injected. Two repos had grown their own copy
+  # of this and a third had none at all, which is how the same defect shipped live to
+  # openSUSE (dotgibson/dotfiles-core#748).
+  #
+  # `mkdir -p` FIRST, and that line is load-bearing rather than tidy. The helper adds only
+  # directories that EXIST — deliberately, so it cannot inject a bogus PATH entry — but the
+  # `export PATH=` this replaces added ~/.local/bin unconditionally. On a fresh box that
+  # directory does not exist yet, so a straight swap would silently DROP it for the whole
+  # first run: the starship installer writes into it at that point, the atuin block links
+  # atuin into it, and then `command -v atuin` for the systemd user unit below would miss
+  # the binary this script had just put there and skip the unit. Creating the directory we
+  # are about to install into is a statement of intent, not a guess.
+  mkdir -p "$HOME/.local/bin" 2>/dev/null || true
+  # It adds only what exists, so it is called AGAIN below once mise.run has run and the
+  # cargo builds may have created ~/.cargo/bin. Idempotent by construction.
+  blib_user_bindirs_on_path
 
   sudo_keepalive_start
 
@@ -432,6 +453,12 @@ provision() {
     blib_say "mise (official installer)"
     run_installer mise https://mise.run
   fi
+  # Re-run the PATH prelude: the helper adds only directories that already EXIST, and
+  # ~/.local/bin is the one mise.run may have just created. Without this the
+  # `command -v mise` arm of _dotfiles_go_install below is blind to the mise this script
+  # just installed — the exact probe that shipped a broken bootstrap to openSUSE
+  # (dotgibson/dotfiles-core#748). Same for ~/.cargo/bin after the crate builds above.
+  blib_user_bindirs_on_path
   # lazygit isn't in Fedora's base repos — pull it from the well-known COPR.
   if ! command -v lazygit >/dev/null; then
     blib_say "lazygit (COPR atim/lazygit)"
