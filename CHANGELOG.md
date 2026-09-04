@@ -25,7 +25,7 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
   "is the tool present afterwards" can never fail under one. Core has shipped
   `blib_user_bindirs_on_path` for exactly this since dotgibson/dotfiles-core#425 — it resolves
   `CARGO_HOME` and `GOBIN`/`GOPATH` rather than hard-coding them, and adds only directories
-  that **exist**, so it is called again after an installer creates one. A second call now runs after the `mise.run` install, so `_dotfiles_go_install`'s `command -v mise` arm sees the mise this script just installed.
+  that **exist**, so it is called again after an installer creates one. The directory this script installs into is `mkdir -p`'d before the helper runs: the helper adds only directories that already **exist**, so a straight swap for the old unconditional `export` would have dropped `~/.local/bin` for the whole first run and made `command -v atuin` miss the binary the atuin block had just linked there, skipping the systemd user unit. A second call now runs after the `mise.run` install, so `_dotfiles_go_install`'s `command -v mise` arm sees the mise this script just installed.
 - **`make check` was not hermetic, and wrote Core into your real config dir
   (dotgibson/dotfiles-core#852).** The target promises "a hermetic `--links-only` run
   against a throwaway HOME" and redirected only `HOME` — but `bootstrap.sh` resolves its

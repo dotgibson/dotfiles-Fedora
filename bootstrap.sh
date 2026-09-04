@@ -265,8 +265,17 @@ provision() {
   # of this and a third had none at all, which is how the same defect shipped live to
   # openSUSE (dotgibson/dotfiles-core#748).
   #
-  # It adds only what exists, so it is called AGAIN below once mise.run has created
-  # ~/.local/bin. Idempotent by construction.
+  # `mkdir -p` FIRST, and that line is load-bearing rather than tidy. The helper adds only
+  # directories that EXIST — deliberately, so it cannot inject a bogus PATH entry — but the
+  # `export PATH=` this replaces added ~/.local/bin unconditionally. On a fresh box that
+  # directory does not exist yet, so a straight swap would silently DROP it for the whole
+  # first run: the starship installer writes into it at that point, the atuin block links
+  # atuin into it, and then `command -v atuin` for the systemd user unit below would miss
+  # the binary this script had just put there and skip the unit. Creating the directory we
+  # are about to install into is a statement of intent, not a guess.
+  mkdir -p "$HOME/.local/bin" 2>/dev/null || true
+  # It adds only what exists, so it is called AGAIN below once mise.run has run and the
+  # cargo builds may have created ~/.cargo/bin. Idempotent by construction.
   blib_user_bindirs_on_path
 
   sudo_keepalive_start
