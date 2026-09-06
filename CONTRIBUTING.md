@@ -11,7 +11,7 @@ file is the one it shows. Core's own
 
 ## The rule that bites: never hand-edit `core/`
 
-`core/` is a **vendored `git subtree` copy** of
+`core/` is a **vendored copy** of
 [`dotfiles-core`](https://github.com/dotgibson/dotfiles-core). It is overwritten on the
 next sync, so an edit there is silent drift: it works until a sync clobbers it, and it
 never reaches the source of truth.
