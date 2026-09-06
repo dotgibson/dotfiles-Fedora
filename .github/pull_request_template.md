@@ -11,7 +11,7 @@
       `dotfiles-core`** (`make audit` there, then `make sync`), not here.
 - [ ] **Sync PR** — vendors a new Core release into `core/`. No hand-edits.
 
-> `core/` is a vendored `git subtree` copy and is overwritten on the next sync. The
+> `core/` is a vendored copy and is overwritten on the next sync. The
 > `core-integrity` check compares its tree SHA against `core.lock` and will fail on any
 > hand-edit. See [CONTRIBUTING.md](../CONTRIBUTING.md).
 

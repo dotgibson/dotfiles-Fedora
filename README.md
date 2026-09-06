@@ -113,7 +113,7 @@ cd ~/dotfiles-Fedora
 exec zsh
 ```
 
-`core/` is a vendored subtree and is **already present** in a clone — there is no
+`core/` is a vendored copy and is **already present** in a clone — there is no
 submodule step. `bootstrap.sh` is idempotent: it provisions `dnf` packages and
 symlinks Core + the Fedora layer into place.
 
