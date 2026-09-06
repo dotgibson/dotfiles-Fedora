@@ -21,6 +21,11 @@ ZSH_FILES := $(shell git ls-files '*.zsh' ':!:core/**' 2>/dev/null)
 # Same pathspec the reusable gate's markdown leg uses, so `make markdown` scans exactly
 # what CI scans — including the .github/ files a top-level '*.md' glob never saw.
 MD_FILES  := $(shell git ls-files '*.md' ':!:core/**' 2>/dev/null)
+# The markdown linter is PINNED to the version the blocking gate installs, read from the
+# vendored Core pins rather than restated here — one number, one place. See the markdown
+# target for why this is npx and not a global binary (dotfiles-core#873).
+CORE_PINS := core/scripts/tool-versions.env
+MARKDOWNLINT_VERSION := $(shell sed -n 's/^MARKDOWNLINT_VERSION=//p' $(CORE_PINS) 2>/dev/null)
 
 help: ## Show this help
 	@echo "dotfiles-Fedora — make targets:"
@@ -60,10 +65,21 @@ markdown: ## markdownlint the repo-owned docs (shares .markdownlint.jsonc with C
 	@# and lints `git ls-files '*.md' ':!:core/**'` — which is recursive. The glob was
 	@# top-level only, so the three .github/ markdown files were CI-enforced and locally
 	@# invisible, and this target could read green against a red required check.
-	@if ! command -v markdownlint-cli2 >/dev/null 2>&1; then \
-	  echo "markdownlint-cli2 not installed: npm i -g markdownlint-cli2 — skipping"; \
+	@#
+	@# npx AND A PIN, not a global markdownlint-cli2 (dotfiles-core#873). The probe used to
+	@# be `command -v markdownlint-cli2`, and nothing in this repo's bootstrap installs that
+	@# — so on a normal box the guard fired every time and the target never linted anything.
+	@# A local mirror of a blocking gate that always skips is not a mirror. And where the
+	@# binary DID exist it was whatever npm last put there, while the gate runs the pinned
+	@# version, so a rule that changes across a bump reds CI against a green run here.
+	@# npx needs only node, fetches the exact pinned version, and REFUSES rather than guess
+	@# if the pin is unreadable — a silently-unpinned lint is the thing being fixed.
+	@if ! command -v npx >/dev/null 2>&1; then echo "npx not available — skipping markdown"; \
+	elif test -z "$(MARKDOWNLINT_VERSION)"; then \
+	  echo "!! MARKDOWNLINT_VERSION unreadable from $(CORE_PINS) — refusing to lint unpinned"; exit 1; \
 	elif test -z "$(MD_FILES)"; then echo "no repo-owned .md"; \
-	else echo "markdownlint-cli2 $(MD_FILES)"; markdownlint-cli2 $(MD_FILES); fi
+	else echo "markdownlint-cli2@$(MARKDOWNLINT_VERSION) $(MD_FILES)"; \
+	  npx --yes markdownlint-cli2@$(MARKDOWNLINT_VERSION) $(MD_FILES); fi
 
 dry-run: ## Preview the FULL bootstrap plan (packages + symlinks); changes nothing
 	@./bootstrap.sh --dry-run
