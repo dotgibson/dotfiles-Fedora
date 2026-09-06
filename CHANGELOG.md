@@ -13,6 +13,23 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Fixed
 
+- **`make markdown` probed for a global, unpinned `markdownlint-cli2` — so on a normal box it
+  never linted anything** (dotgibson/dotfiles-core#873). Nothing in this repo's bootstrap
+  installs `markdownlint-cli2` globally; it is npm-only. So unless the operator had
+  separately run `npm i -g markdownlint-cli2`, the guard fired on every invocation and the
+  target skipped, cleanly and with exit 0, forever. That is a correct guard doing exactly
+  what it says — and a local mirror of a **blocking** CI gate that has never mirrored
+  anything. dotgibson/dotfiles-core#775 fixed this target's skip guard and its file scope;
+  neither defect could bite while the target never ran at all. And where the binary *was*
+  installed it was whatever version npm last put there, while `lint-call.yml` installs the
+  pinned `MARKDOWNLINT_VERSION` — so a rule that changes across a bump reds a required check
+  against a green local run. It now runs the **pinned** version through `npx`, reading the
+  number from the vendored `core/scripts/tool-versions.env` rather than restating it, and
+  **refuses** rather than guess if that pin is unreadable — a silently-unpinned lint being
+  the thing this fixes. `npx` needs only node, which is far likelier present than a global
+  markdownlint install, and still self-skips without it so `make lint` works on a bare box.
+  Converges on the shape `dotfiles-Offense` and `dotfiles-Defense` already run.
+
 - **`bootstrap.sh`'s `PATH` is not the shell's `PATH` — adopt `blib_user_bindirs_on_path`**
   (dotgibson/dotfiles-core#748). Replaces the hand-rolled `export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.atuin/bin:$PATH"` prelude. `~/.local/bin`, `~/.cargo/bin` and `$GOBIN` reach
   `PATH` only through the zsh layer, i.e. only inside a Core shell — which does not exist
