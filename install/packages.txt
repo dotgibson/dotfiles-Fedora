@@ -4,13 +4,16 @@
 # of here. Two different reasons, so don't collapse them back into one line:
 #   starship, yazi — genuinely absent from every current Fedora release; the
 #     upstream installer (starship) / cargo (yazi) is the only automatic path.
-#   atuin — IS packaged now (F43/F45/rawhide carry 18.12.1, F44 only 18.11.0), but
-#     Fedora trails upstream 18.19.0, and 18.19.0 is the exact client
+#   atuin — IS packaged now (F43/F44/F45/rawhide ALL carry 18.12.1; F44 caught up),
+#     but 18.12.1 still pre-dates 18.19.0, the exact client
 #     core/PORTING-MATRIX.md's atuin²⁰ note validated the daemon config-precedence
-#     behavior against. Taking the RPM would swap a known-good atuin for an
-#     unvalidated one, so the upstream installer stays. Revisit when Fedora catches
-#     up: bootstrap.sh's three atuin blocks are all presence-guarded, so adding the
-#     name here is the only edit it would take.
+#     behavior against. Upstream has moved on too — the installer bootstrap.sh runs
+#     now lands 18.21.0 (2026-08-31) — so neither route is 18.19.0 any more and the
+#     old "known-good vs unvalidated" split no longer separates them. What still does:
+#     the installer's drift is FORWARD of the validation, the RPM's is BACKWARD, so the
+#     installer stays. Revisit when Fedora ships ≥ 18.19.0: bootstrap.sh's three atuin
+#     blocks are all presence-guarded, so adding the name here is the only edit it
+#     would take.
 
 # ── shell + multiplexer ───────────────────────────────────────
 zsh
@@ -26,13 +29,15 @@ fzf            # fuzzy finder
 git-delta      # git pager / diffs
 btop           # top/htop
 tealdeer       # tldr (fast Rust client; binary: tldr) — ORPHANED, last built F44; no
-               # F45/rawhide(F46) build. Kept here for F43/F44; bootstrap.sh
-               # cargo-installs it wherever dnf no longer resolves the name.
+               # F45/rawhide(F46) build, so the name stops resolving on 2026-10-20
+               # (F45 GA). Kept here for F43/F44; bootstrap.sh cargo-installs it
+               # wherever dnf no longer resolves the name.
 
 # ── modern CLI extras (core-doctor probes these; see per-entry notes) ─
 duf            # df   (disk usage/free)
 procs          # ps — ORPHANED, last built F44; no F45/rawhide(F46) build. Same deal as
-               # tealdeer above: kept for F43/F44, cargo fallback covers F45+.
+               # tealdeer above, same 2026-10-20 date: kept for F43/F44, cargo fallback
+               # covers F45+.
 yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (python-yq is the separate Python tool)
 glow           # markdown viewer
 gum            # shell-script UI toolkit (charm)
@@ -44,7 +49,9 @@ du-dust        # dust (du) — Fedora's package name; installs the `dust` binary
 # built 1.0.0-4.fc41), so `dnf install gron` / `dnf install sd` both fail on a
 # current release — hence the go/cargo fallbacks.
 # tealdeer and procs are mid-way down that same road: both went orphan and neither
-# was rebuilt for F45 or rawhide (F46), but both still install on F43/F44. They
+# was rebuilt for F45 or rawhide (F46) — F45 branched 2026-08-11 and neither source
+# package (rust-tealdeer, rust-procs) survives in rawhide, so this is retirement with a
+# calendar date, not a transient FTBFS — but both still install on F43/F44. They
 # therefore stay ACTIVE in this list (removing them would swap a fast RPM for a slow
 # source build on every currently-supported release) and bootstrap.sh carries
 # presence-guarded cargo fallbacks for them. The dnf install uses --skip-unavailable,
