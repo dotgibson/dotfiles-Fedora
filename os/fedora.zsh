@@ -120,8 +120,14 @@ fi
 unset _IS_WSL
 
 # ── auto-start/attach tmux for interactive terminals ─────────────────────────
-# Skip inside an existing tmux, VS Code's integrated terminal, and non-TTYs.
+# Skip inside an existing tmux, VS Code's integrated terminal, non-TTYs, and when
+# DOTFILES_NO_AUTOTMUX is set — the fleet's one opt-out name (MacBook, openSUSE and Gentoo
+# read it too). Any harness that drives an interactive zsh and must not land in tmux exports
+# it: dotfiles-core's README hero render sources this layer from inside vhs, and without the
+# knob it attached here and typed its whole tour into a fresh `main` session
+# (dotgibson/dotfiles-core#877). Core's gen-hero-tape.sh refuses to render on a layer that
+# does not honour it.
 if command -v tmux >/dev/null 2>&1 \
-   && [[ -z "$TMUX" && -t 1 && "$TERM_PROGRAM" != "vscode" ]]; then
+   && [[ -z "$TMUX" && -z "${DOTFILES_NO_AUTOTMUX:-}" && -t 1 && "$TERM_PROGRAM" != "vscode" ]]; then
   tmux attach -t main 2>/dev/null || tmux new-session -s main
 fi

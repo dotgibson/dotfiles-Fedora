@@ -13,6 +13,14 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Fixed
 
+- **The tmux auto-attach honours `DOTFILES_NO_AUTOTMUX`, the fleet's one opt-out name**
+  (dotgibson/dotfiles-core#877). MacBook, openSUSE and Gentoo already read it; this layer
+  attached unconditionally for any interactive TTY, which is how dotfiles-core's README hero
+  render — a vhs session that sources this layer — typed its whole tour into a fresh `main`
+  session. Core's `gen-hero-tape.sh` now refuses to render a hero on a layer that does not
+  honour the knob. Export `DOTFILES_NO_AUTOTMUX=1` for any harness that drives an interactive
+  zsh and must not land in tmux.
+
 - **`make markdown` probed for a global, unpinned `markdownlint-cli2` — so on a normal box it
   never linted anything** (dotgibson/dotfiles-core#873). Nothing in this repo's bootstrap
   installs `markdownlint-cli2` globally; it is npm-only. So unless the operator had
