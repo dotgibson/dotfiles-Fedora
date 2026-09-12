@@ -20,17 +20,6 @@
 # missing (hand-installed atuin, or a bootstrap that predates it) so at least the command works.
 [[ -d "$HOME/.atuin/bin" && ":$PATH:" != *":$HOME/.atuin/bin:"* ]] && export PATH="$HOME/.atuin/bin${PATH:+:$PATH}"
 
-# ── Detect WSL once (for the niceties below) ──────────────────────────────────
-_IS_WSL=0
-if [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
-  _IS_WSL=1
-elif [[ -r /proc/version ]]; then
-  # zsh reads the file directly (no grep/cat fork) — WSL kernels tag /proc/version.
-  _pv="$(</proc/version)"; _pv=${_pv:l}
-  [[ "$_pv" == *microsoft* || "$_pv" == *wsl* ]] && _IS_WSL=1
-  unset _pv
-fi
-
 # ── Clipboard: delegate to Core's cross-OS scripts (single implementation) ────
 command -v clip       >/dev/null && alias pbcopy='clip'
 command -v clip-paste >/dev/null && alias pbpaste='clip-paste'
@@ -62,7 +51,10 @@ command -v op >/dev/null 2>&1 && alias opsignin='eval "$(op signin)"'
 alias localip='ip -brief -4 addr show scope global'     # iface + LAN IP(s)
 
 # ── WSL-only niceties (interop reach-arounds into Windows) ───────────────────
-if (( _IS_WSL )); then
+# The predicate is Core's: _core_is_wsl (core/zsh/00-tools.zsh, band 00, lazily memoised
+# — dotfiles-core#449). This layer used to re-derive it; the reusable lint workflow now
+# fails any OS layer that grows its own back.
+if _core_is_wsl; then
   alias open='explorer.exe'                 # `open .` opens the dir in Explorer
   command -v wslview >/dev/null && alias xdg-open='wslview'
   # jump to your Windows user home: set WINHOME in 99-local.zsh, e.g.
@@ -116,8 +108,6 @@ if [[ -n ${HAVE_ATUIN:-} ]]; then
   export ATUIN_DAEMON__ENABLED=true
   [[ -d /run/systemd/system ]] || export ATUIN_DAEMON__AUTOSTART=true
 fi
-
-unset _IS_WSL
 
 # ── auto-start/attach tmux for interactive terminals ─────────────────────────
 # Skip inside an existing tmux, VS Code's integrated terminal, non-TTYs, and when
