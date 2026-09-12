@@ -38,7 +38,7 @@ duf            # df   (disk usage/free)
 procs          # ps — ORPHANED, last built F44; no F45/rawhide(F46) build. Same deal as
                # tealdeer above, same 2026-10-20 date: kept for F43/F44, cargo fallback
                # covers F45+.
-yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (python-yq is the separate Python tool)
+yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (kislyuk's Python yq is not packaged for Fedora at all)
 glow           # markdown viewer
 gum            # shell-script UI toolkit (charm)
 du-dust        # dust (du) — Fedora's package name; installs the `dust` binary, same as Debian's
