@@ -178,6 +178,17 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Changed
 
+- **`make check` runs Core's vendored `check-links.sh` instead of its own copy of the
+  hermetic `--links-only` gate** (dotgibson/dotfiles-core#975, #852). The recipe carried one
+  of four near-identical copies of that block across the fleet, and they drifted the way copies
+  do: #852 found the same non-hermetic-HOME defect in three of them at once and had to fix it
+  three times by hand. The script has been vendored as `core/scripts/check-links.sh` since
+  then with its consumer named "as intent rather than as a file" — nine releases later no
+  Makefile had followed. Now this one calls it: the Core graph is the script's own default,
+  and `--require` adds the four things this repo's OS layer wires on top (`80-os.zsh`,
+  `os.capabilities`, tmux `os.conf`, git `os.gitconfig`). Exit 2 is the drift signal, 1 means
+  the check could not run.
+
 - **`bootstrap.sh` runs on Core's escalation, sudo-keepalive and failure-tally helpers
   instead of private copies** (dotgibson/dotfiles-core#867). `blib_resolve_su` replaces the
   hand-rolled root/sudo/doas probe — the same `$EUID` string compare, plus an absolute path
