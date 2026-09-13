@@ -176,6 +176,21 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
   no-op once the RPM is in, and it is what catches `dnf --skip-unavailable` silently
   dropping the name if `du-dust` ever follows `sd`/`gron` out of the repos.
 
+### Changed
+
+- **`bootstrap.sh` runs on Core's escalation, sudo-keepalive and failure-tally helpers
+  instead of private copies** (dotgibson/dotfiles-core#867). `blib_resolve_su` replaces the
+  hand-rolled root/sudo/doas probe — the same `$EUID` string compare, plus an absolute path
+  for the escalator, and `--require` only when packages will actually be installed, so
+  `--dry-run` no longer demands one. `blib_sudo_keepalive_start` / `_stop` replace the
+  private refresher loop and its trap. `note_fail` is now a one-line shim over
+  `blib_note_fail`, and the closing report comes from `blib_failures_report` — which means
+  the failures the shared lib records **itself** (the tpm clone, `blib_install_system_file`)
+  finally appear in it instead of being dropped. Output and `--strict` semantics are
+  unchanged; the one visible difference is that hint lines print the escalator's full path
+  (`/usr/bin/sudo dnf remove …`). Closes this repo's four rows in Core's `audit-core.sh` §5f
+  ledger, which had read 1/9 (Gentoo only) since dotgibson/dotfiles-core#748.
+
 ### Removed
 
 - A stale 4.5 MB orphaned worktree copy under `.claude/worktrees/`, and the obsolete

@@ -108,11 +108,11 @@ if ((SKIP_SEEN)); then blib_select --skip "$SKIP_RAW"; fi
 # exited 0 regardless — so a machine missing carapace, op, lazygit AND every cargo tool
 # reported success, and neither CI nor the operator had a signal. Record each miss and
 # report them together at the end (and exit non-zero under --strict).
-FAILED_STEPS=()
-note_fail() {
-  FAILED_STEPS+=("$1")
-  blib_warn "$1"
-}
+# note_fail — a thin shim over Core's blib_note_fail, which records into BLIB_FAILED and
+# warns exactly as this used to. blib_failures_report prints the tally at the end, so the
+# failures the shared lib records ITSELF (the tpm clone, blib_install_system_file) now
+# land in the same report instead of being dropped on the floor.
+note_fail() { blib_note_fail "$@"; }
 
 # ── sanity: confirm we're on Fedora ───────────────────────────────────────────
 # Parse the ID= / ID_LIKE= KEYS rather than grepping the whole file for "fedora": the old
@@ -155,29 +155,15 @@ if blib_is_wsl; then IS_WSL=1; fi
 # doing anything at all. It is also why the reusable CI test can only exercise --links-only
 # with BLIB_SU= . Resolving here fixes both, and keeps the lib's own escalations
 # (blib_set_login_shell) in step with ours.
-if [[ -z "${BLIB_SU+x}" ]]; then
-  # STRING compare, and tolerate `id` itself being unavailable. `[[ "$(id -u)" -eq 0 ]]` is
-  # an ARITHMETIC comparison, and bash evaluates an empty string there as 0 — so on a box
-  # where `id` is missing or off PATH that concluded "we are root" and then ran every
-  # privileged command unescalated. Fail closed to "not root": the worst case is a
-  # needless sudo. (Same fix landed upstream in blib_resolve_su.)
-  _uid="$(id -u 2>/dev/null || true)"
-  if [[ "$_uid" == "0" ]]; then
-    BLIB_SU=""
-  elif command -v sudo >/dev/null 2>&1; then
-    BLIB_SU="sudo"
-  elif command -v doas >/dev/null 2>&1; then
-    BLIB_SU="doas"
-  else
-    BLIB_SU=""
-    ((LINKS_ONLY)) || {
-      echo "Not root and neither sudo nor doas is installed — cannot install packages." >&2
-      echo "Re-run as root, install sudo, or use --links-only (which needs no privileges)." >&2
-      exit 1
-    }
-  fi
+# blib_resolve_su, not a hand-rolled probe: it decides "root" from $EUID (a STRING compare,
+# so a missing `id` cannot read as root), pins the ABSOLUTE path of sudo or doas, and
+# honours an explicit BLIB_SU= from the caller (CI's --links-only leg). --require only when
+# packages will actually be installed: wiring symlinks and a dry run need no privileges.
+if ((LINKS_ONLY)) || ((BLIB_DRY)); then
+  blib_resolve_su || true
+else
+  blib_resolve_su --require || exit 1
 fi
-export BLIB_SU
 # priv <cmd...> — run CMD under the resolved escalator, or directly when we are already
 # root. Never invokes an empty-string command (which would be a "" not found error).
 priv() {
@@ -212,40 +198,10 @@ preflight_cmds() {
 preflight_cmds
 
 # ── keep the sudo timestamp warm for the whole run ────────────────────────────
-# Every `sudo` below sits AFTER cargo/go builds that take minutes — comfortably longer than
-# sudo's 5-minute timestamp — and several of those calls redirected stderr to /dev/null.
-# sudo writes its PROMPT to stderr and reads the password from the TTY, so the run stopped
-# dead at an INVISIBLE prompt: no output, no progress, indistinguishable from a hang. (The
-# same failure mode the 1Password note further down records for `up` / `maint-run`.)
-#
-# Prime the timestamp ONCE up front, with the prompt visible, then refresh it in the
-# background so no later call can ever block. Only meaningful for sudo: doas has no
-# refreshable timestamp API, and as root there is nothing to prime.
-SUDO_KEEPALIVE_PID=""
-sudo_keepalive_start() {
-  [[ "$BLIB_SU" == sudo ]] || return 0
-  blib_say "priming sudo (asks once; the timestamp is kept warm for the whole run)"
-  sudo -v || {
-    echo "sudo authentication failed — cannot provision packages." >&2
-    exit 1
-  }
-  # kill -0 "$$" stops the refresher when this script exits even if the trap is missed
-  # (e.g. SIGKILL), so it can never outlive the bootstrap as an orphan.
-  while true; do
-    sudo -n true 2>/dev/null || true
-    sleep 50
-    kill -0 "$$" 2>/dev/null || exit 0
-  done &
-  SUDO_KEEPALIVE_PID=$!
-  # shellcheck disable=SC2064  # expand the PID NOW: the var is reset below on stop
-  trap "kill $SUDO_KEEPALIVE_PID 2>/dev/null || true" EXIT
-}
-sudo_keepalive_stop() {
-  [[ -n "$SUDO_KEEPALIVE_PID" ]] || return 0
-  kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
-  SUDO_KEEPALIVE_PID=""
-  trap - EXIT
-}
+# Core's blib_sudo_keepalive_start / _stop (core/lib/bootstrap-lib.sh): prime sudo ONCE up
+# front with the prompt visible, then refresh it in the background so no later call can
+# stop the run dead at an INVISIBLE prompt after a minutes-long download. Started inside
+# provision(), which owns the EXIT trap that stops it. A no-op for doas and for root.
 
 provision() {
   # ── PATH: make the presence guards below tell the TRUTH ─────────────────────
@@ -281,7 +237,11 @@ provision() {
   # cargo builds may have created ~/.cargo/bin. Idempotent by construction.
   blib_user_bindirs_on_path
 
-  sudo_keepalive_start
+  trap 'blib_sudo_keepalive_stop' EXIT
+  blib_sudo_keepalive_start || {
+    echo "sudo authentication failed — cannot provision packages." >&2
+    exit 1
+  }
 
   blib_say "dnf metadata refresh (makecache)"
   priv dnf -y makecache >/dev/null
@@ -770,7 +730,7 @@ elif ((BLIB_DRY)); then
   unset _t
 else
   provision
-  sudo_keepalive_stop
+  blib_sudo_keepalive_stop
 fi
 
 wire_links
@@ -780,11 +740,9 @@ blib_wire_summary
 # Say plainly what did NOT work. The old script printed "complete" and exited 0 no matter
 # how many best-effort steps had failed, so a half-provisioned box looked identical to a
 # good one.
-if ((${#FAILED_STEPS[@]})); then
-  printf '\n%s%s%s %s\n' "${UX_YEL:-}" "${UX_WARN:-!}" "${UX_RST:-}" \
-    "${#FAILED_STEPS[@]} step(s) did not complete:"
-  printf '    - %s\n' "${FAILED_STEPS[@]}"
-  echo
+# blib_failures_report prints the tally (its own and ours, via note_fail) and returns
+# non-zero when anything was recorded; --strict decides whether that is the exit code.
+if ! blib_failures_report; then
   if ((STRICT)); then
     blib_warn "exiting non-zero (--strict)"
     exit 1
