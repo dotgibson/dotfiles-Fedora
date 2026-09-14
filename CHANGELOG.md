@@ -178,6 +178,21 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Changed
 
+- **`bootstrap.sh` runs on Core's bootstrap driver, `blib_main`** (dotgibson/dotfiles-core#986).
+  The shared half — the flag loop, the escalator, the sudo keepalive, the Core symlink
+  surface, the OS overlays, the managed `~/.zshrc`, the login shell, the closing report — now
+  runs from one definition in `core/lib/bootstrap-lib.sh` (vendored since v7.4.0). This file
+  declares what it is (`BOOTSTRAP_OS=fedora`) and keeps only what is Fedora's: the OS guard
+  and preflight as `bootstrap_guard`, the dnf provisioning as `bootstrap_provision` (its body
+  is unchanged), the dry-run preview as `bootstrap_check`, and `--no-flatpak` / `--force-os`
+  through `bootstrap_flag`. 753 → 660 lines. What the driver gives for free: one `--help`
+  (this repo's half, then the shared flags), and `blib_user_bindirs_on_path` running before
+  anything probes rather than only inside `provision()`. One convention change: an unknown
+  flag exits **2** (usage error), not 1, which stays for real failures. Same links, same
+  loader, same exit codes otherwise; `make check` (the vendored links gate) ran green through
+  the driver on a Fedora box, and a real `--dry-run` printed the provisioning plan and wrote
+  nothing.
+
 - **`make check` runs Core's vendored `check-links.sh` instead of its own copy of the
   hermetic `--links-only` gate** (dotgibson/dotfiles-core#975, #852). The recipe carried one
   of four near-identical copies of that block across the fleet, and they drifted the way copies
