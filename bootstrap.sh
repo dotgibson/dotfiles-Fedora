@@ -5,73 +5,22 @@
 # safe to re-run. This is the OS-NATIVE layer; Core (zsh/tmux/nvim/git) is
 # vendored under core/ and symlinked in via the shared core/lib/bootstrap-lib.sh.
 #
-# Run `./bootstrap.sh --help` for the flag list (usage() below is the one definition —
-# do NOT re-add a `sed -n 'N,Mp' "$0"` help, which silently drifts when this header moves;
-# core/scripts/sync-core.sh documents that exact trap).
+# THE DRIVER FORM (dotgibson/dotfiles-core#976, #986). The shared half of a bootstrap — the
+# flags, the escalator, the sudo keepalive, the Core symlink surface, the OS overlays, the
+# managed ~/.zshrc loader, the login shell, the closing report — is core/lib/bootstrap-lib.sh
+# :: blib_main, ONE definition instead of a copy per repo. This file declares what it is,
+# defines the hooks that are genuinely Fedora's (the OS guard + preflight, the dnf
+# provisioning, its dry-run preview, the repo flags), and hands over. `--help` prints both
+# halves; the driver's flags are documented once, at the driver.
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Read by blib_main in the sourced lib (shellcheck does not follow into it).
+# shellcheck disable=SC2034
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
-LINKS_ONLY=0
 DO_FLATPAK=1
-STRICT=0
 FORCE_OS=0
-# --only/--skip are validated by the shared lib (blib_select), which is sourced
-# AFTER this loop — so capture the raw values now and apply them below.
-ONLY_RAW="" SKIP_RAW="" ONLY_SEEN=0 SKIP_SEEN=0
-
-# usage() is a real heredoc, NOT `sed -n '2,17p' "$0"`. The old form was coupled to this
-# file's header line numbers, so editing the banner above silently drifted `--help` — the
-# trap core/scripts/sync-core.sh calls out by name. This stays correct however the header moves.
-usage() {
-  cat <<'EOF'
-bootstrap.sh — provision a Fedora box (Workstation, Server, or WSL) and wire up dotfiles.
-Idempotent: safe to re-run.
-
-  ./bootstrap.sh                  full: dnf packages + extras + symlinks
-  ./bootstrap.sh --links-only     just (re)create symlinks (no dnf, no downloads)
-  ./bootstrap.sh --dry-run        preview EVERYTHING; change nothing
-  ./bootstrap.sh --no-flatpak     skip Flathub/GUI apps (recommended on WSL)
-  ./bootstrap.sh --only zsh,nvim  link ONLY these Core module groups
-  ./bootstrap.sh --skip tmux      link everything EXCEPT these groups
-  ./bootstrap.sh --strict         exit non-zero if any best-effort step failed
-  ./bootstrap.sh --force-os       run on a Fedora-LIKE distro (RHEL/Alma/Rocky/Nobara)
-  ./bootstrap.sh -h, --help       show this help and exit
-
-Module groups (for --only/--skip): zsh nvim tmux git prompt tools — they affect the
-wiring steps only, never package provisioning; combine with --links-only to re-wire a
-subset of configs without touching dnf.
-
-Env:
-  BLIB_SU   privilege escalator; auto-resolved (empty as root, else sudo, else doas).
-            Set explicitly to override, e.g. BLIB_SU=doas or BLIB_SU= to run as root.
-EOF
-}
-
-while [[ $# -gt 0 ]]; do case "$1" in
-  --links-only) LINKS_ONLY=1 ;;
-  --no-flatpak) DO_FLATPAK=0 ;;
-  --dry-run | -n) BLIB_DRY=1 ;;
-  --strict) STRICT=1 ;;
-  --force-os) FORCE_OS=1 ;;
-  --only) [[ $# -ge 2 ]] || { echo "--only requires module names, e.g. --only zsh,nvim" >&2; exit 1; }; ONLY_RAW="$2"; ONLY_SEEN=1; shift ;;
-  --only=*) ONLY_RAW="${1#*=}"; ONLY_SEEN=1 ;;
-  --skip) [[ $# -ge 2 ]] || { echo "--skip requires module names, e.g. --skip tmux" >&2; exit 1; }; SKIP_RAW="$2"; SKIP_SEEN=1; shift ;;
-  --skip=*) SKIP_RAW="${1#*=}"; SKIP_SEEN=1 ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    echo "unknown arg: $1" >&2
-    usage >&2
-    exit 1
-    ;;
-  esac; shift; done
-# BLIB_DRY is read by the shared lib's mutating helpers via ${BLIB_DRY:-0} at CALL time,
-# so setting it here (before the lib is sourced) is enough. Default it so `set -u` is safe.
-: "${BLIB_DRY:=0}"
 
 # ── core/ subtree present? (inline: can't source a lib out of core/ before this) ─
 # Validate the SPECIFIC paths we depend on (zsh modules + the two libs sourced
@@ -96,10 +45,36 @@ source "$DOTFILES/core/lib/ux.sh"
 # shellcheck source=core/lib/bootstrap-lib.sh
 source "$DOTFILES/core/lib/bootstrap-lib.sh"
 
-# Apply any --only/--skip module selection now the validator (blib_select) exists;
-# it aborts on a malformed selector or an unknown group.
-if ((ONLY_SEEN)); then blib_select --only "$ONLY_RAW"; fi
-if ((SKIP_SEEN)); then blib_select --skip "$SKIP_RAW"; fi
+# ── what this repo is (read by blib_main) ─────────────────────────────────────
+# shellcheck disable=SC2034
+BOOTSTRAP_NAME="Fedora"
+# shellcheck disable=SC2034
+BOOTSTRAP_OS=fedora # → blib_link_os_layer: os/fedora.{zsh,conf,gitconfig,capabilities}
+
+# ── hooks (called by blib_main, in its order; shellcheck cannot see that) ─────
+# shellcheck disable=SC2329
+bootstrap_usage() {
+  cat <<'EOF'
+bootstrap.sh — provision a Fedora box (Workstation, Server, or WSL) and wire up dotfiles.
+Idempotent: safe to re-run.
+
+  ./bootstrap.sh --no-flatpak     skip Flathub/GUI apps (recommended on WSL)
+  ./bootstrap.sh --force-os       run on a Fedora-LIKE distro (RHEL/Alma/Rocky/Nobara)
+
+Env:
+  BLIB_SU   privilege escalator; auto-resolved (empty as root, else sudo, else doas).
+            Set explicitly to override, e.g. BLIB_SU=doas or BLIB_SU= to run as root.
+EOF
+}
+# shellcheck disable=SC2329
+bootstrap_flag() {
+  case "$1" in
+  --no-flatpak) DO_FLATPAK=0 ;;
+  --force-os) FORCE_OS=1 ;;
+  *) return 1 ;;
+  esac
+  return 0
+}
 
 # ── deferred failures ─────────────────────────────────────────────────────────
 # ~20 steps below are deliberately best-effort (`|| true` / a warning): a COPR that is
@@ -114,7 +89,7 @@ if ((SKIP_SEEN)); then blib_select --skip "$SKIP_RAW"; fi
 # land in the same report instead of being dropped on the floor.
 note_fail() { blib_note_fail "$@"; }
 
-# ── sanity: confirm we're on Fedora ───────────────────────────────────────────
+# ── the OS guard + preflight, as ONE hook: refuse the wrong box before anything runs ──
 # Parse the ID= / ID_LIKE= KEYS rather than grepping the whole file for "fedora": the old
 # `grep -qi fedora /etc/os-release` matched ID_LIKE="fedora" (RHEL, Alma, Rocky, CentOS
 # Stream, Nobara) and any incidental substring — e.g. a HOME_URL — so those distros sailed
@@ -126,46 +101,29 @@ _osr_field() { # <KEY> — the unquoted value of KEY in /etc/os-release ("" when
 }
 OS_ID="$(_osr_field ID)"
 OS_ID_LIKE="$(_osr_field ID_LIKE)"
-if [[ "$OS_ID" != fedora ]]; then
-  if [[ " $OS_ID_LIKE " == *" fedora "* ]]; then
-    if ((FORCE_OS)); then
-      blib_warn "ID=$OS_ID is only fedora-LIKE — continuing under --force-os; package names may differ"
+os_guard() {
+  if [[ "$OS_ID" != fedora ]]; then
+    if [[ " $OS_ID_LIKE " == *" fedora "* ]]; then
+      if ((FORCE_OS)); then
+        blib_warn "ID=$OS_ID is only fedora-LIKE — continuing under --force-os; package names may differ"
+      else
+        echo "This bootstrap targets Fedora (ID=fedora); this box reports ID=$OS_ID (ID_LIKE=$OS_ID_LIKE)." >&2
+        echo "Package names and RPM Fusion releases differ there. Re-run with --force-os to proceed anyway." >&2
+        exit 1
+      fi
     else
-      echo "This bootstrap targets Fedora (ID=fedora); this box reports ID=$OS_ID (ID_LIKE=$OS_ID_LIKE)." >&2
-      echo "Package names and RPM Fusion releases differ there. Re-run with --force-os to proceed anyway." >&2
+      echo "This bootstrap targets Fedora. /etc/os-release reports ID=${OS_ID:-<none>}." >&2
       exit 1
     fi
-  else
-    echo "This bootstrap targets Fedora. /etc/os-release reports ID=${OS_ID:-<none>}." >&2
-    exit 1
   fi
-fi
+}
+
 
 IS_WSL=0
 if blib_is_wsl; then IS_WSL=1; fi
 
-# ── privilege escalation ──────────────────────────────────────────────────────
-# Resolve the escalator ONCE, the way the shared lib expects (it reads $BLIB_SU, defaulting
-# to `sudo` only when the var is UNSET — so an explicit empty value means "run directly").
-#
-# The old script hard-coded `sudo` at a dozen call sites. That is wrong wherever there is no
-# sudo to call: a `fedora:latest` container, a WSL distro's first boot (root, before wsl.conf
-# installs the default user), and a minimal Server image all lack it — so `./bootstrap.sh`
-# died at the FIRST dnf line with `sudo: command not found` (exit 127 under set -e), before
-# doing anything at all. It is also why the reusable CI test can only exercise --links-only
-# with BLIB_SU= . Resolving here fixes both, and keeps the lib's own escalations
-# (blib_set_login_shell) in step with ours.
-# blib_resolve_su, not a hand-rolled probe: it decides "root" from $EUID (a STRING compare,
-# so a missing `id` cannot read as root), pins the ABSOLUTE path of sudo or doas, and
-# honours an explicit BLIB_SU= from the caller (CI's --links-only leg). --require only when
-# packages will actually be installed: wiring symlinks and a dry run need no privileges.
-if ((LINKS_ONLY)) || ((BLIB_DRY)); then
-  blib_resolve_su || true
-else
-  blib_resolve_su --require || exit 1
-fi
-# priv <cmd...> — run CMD under the resolved escalator, or directly when we are already
-# root. Never invokes an empty-string command (which would be a "" not found error).
+# priv <cmd...> — run CMD under the escalator blib_main resolved (BLIB_SU: an absolute path,
+# or empty when root). Never invokes an empty-string command.
 priv() {
   if [[ -n "$BLIB_SU" ]]; then "$BLIB_SU" "$@"; else "$@"; fi
 }
@@ -178,7 +136,7 @@ preflight_cmds() {
   # --links-only has NO hard requirements: wiring is pure shell plus coreutils. Notably it
   # must not demand git — the reusable CI test provisions only `bash zsh` and pre-seeds the
   # tpm dir precisely so the wiring path stays offline and deterministic.
-  ((LINKS_ONLY)) || need=(dnf rpm curl sed awk)
+  ((BLIB_LINKS_ONLY)) || need=(dnf rpm curl sed awk)
   local c
   for c in "${need[@]}"; do
     command -v "$c" >/dev/null 2>&1 || missing+=("$c")
@@ -195,15 +153,34 @@ preflight_cmds() {
     blib_warn "git is not installed — the one-time tpm clone will be skipped; install git, then re-run with --links-only (or clone tpm by hand and press prefix + I)"
   fi
 }
-preflight_cmds
+# shellcheck disable=SC2329
+bootstrap_guard() {
+  os_guard
+  preflight_cmds
+}
 
-# ── keep the sudo timestamp warm for the whole run ────────────────────────────
-# Core's blib_sudo_keepalive_start / _stop (core/lib/bootstrap-lib.sh): prime sudo ONCE up
-# front with the prompt visible, then refresh it in the background so no later call can
-# stop the run dead at an INVISIBLE prompt after a minutes-long download. Started inside
-# provision(), which owns the EXIT trap that stops it. A no-op for doas and for root.
+# A dry run must preview provisioning too, not silently skip half the script. The driver
+# never fakes bootstrap_provision under --dry-run; this report-only hook (it runs unless
+# --links-only) prints the plan instead — what dnf would be asked for, which extras are
+# missing — and does nothing on a real run.
+# shellcheck disable=SC2329
+bootstrap_check() {
+  [[ "${BLIB_DRY:-0}" != 0 ]] || return 0 # unset on a real run under set -u; the lib reads it the same way
+  blib_say "would refresh dnf metadata and install RPM Fusion (free + nonfree)"
+  if [[ -f "$DOTFILES/install/packages.txt" ]]; then
+    _dry_pkgs=()
+    mapfile -t _dry_pkgs < <(blib_read_pkgs "$DOTFILES/install/packages.txt")
+    blib_say "would dnf install ${#_dry_pkgs[@]} packages: ${_dry_pkgs[*]}"
+  else
+    blib_warn "install/packages.txt is missing — a real run would abort here"
+  fi
+  for _t in starship atuin mise lazygit yazi dust xh sd viddy tldr procs doggo sesh gron carapace op; do
+    command -v "$_t" >/dev/null 2>&1 || blib_say "would install: $_t"
+  done
+  unset _t
+}
 
-provision() {
+bootstrap_provision() {
   # ── PATH: make the presence guards below tell the TRUTH ─────────────────────
   # Every `command -v <tool>` guard in this function decides whether to spend MINUTES
   # building from source. But cargo installs into ~/.cargo/bin and GOBIN is ~/.local/bin,
@@ -680,74 +657,4 @@ REPO
   fi
 }
 
-wire_links() {
-  # The shared symlink surface + the Fedora OS overlays + the managed .zshrc
-  # loader + the default-login-shell switch all live in core/lib/bootstrap-lib.sh.
-  blib_link_core "$DOTFILES" "$CONFIG"
-  blib_link_os_layer "$DOTFILES" "$CONFIG" fedora
-  # shellcheck disable=SC2119  # no args is intentional — writes the default module set
-  blib_write_zshrc_loader
-  blib_set_login_shell
-  # Install the local pre-commit guard that refuses hand-edits to the vendored core/
-  # subtree. .git/hooks is NOT version-controlled, so a fresh clone has none — and
-  # sync-core.sh only (re)installs it in repos it fans out INTO, which is no help to
-  # someone who just cloned this one. The lib's own docstring says a bootstrap should
-  # call this; it never did. The PR-time core-integrity workflow is the durable backstop,
-  # but this catches the edit before it is ever committed.
-  #
-  # Dry-run guarded at the CALL SITE on purpose: blib_install_core_guard writes
-  # .git/hooks/pre-commit unconditionally (it predates BLIB_DRY and does not consult it),
-  # so calling it under --dry-run would mutate the repo during a run that promises not to.
-  if ((BLIB_DRY)); then
-    blib_say "would install the core/ pre-commit guard in $DOTFILES"
-  else
-    blib_install_core_guard "$DOTFILES" || true
-  fi
-  blib_ok "symlinks wired$(blib_selected_note)"
-}
-
-# ── run ───────────────────────────────────────────────────────────────────────
-if ((BLIB_DRY)); then
-  blib_say "DRY RUN — nothing below is executed or written"
-fi
-
-if ((LINKS_ONLY)); then
-  :
-elif ((BLIB_DRY)); then
-  # A dry run must preview provisioning too, not silently skip half the script. Print the
-  # plan (what dnf would be asked for, which extras are missing) without touching anything.
-  blib_say "would refresh dnf metadata and install RPM Fusion (free + nonfree)"
-  if [[ -f "$DOTFILES/install/packages.txt" ]]; then
-    _dry_pkgs=()
-    mapfile -t _dry_pkgs < <(blib_read_pkgs "$DOTFILES/install/packages.txt")
-    blib_say "would dnf install ${#_dry_pkgs[@]} packages: ${_dry_pkgs[*]}"
-  else
-    blib_warn "install/packages.txt is missing — a real run would abort here"
-  fi
-  for _t in starship atuin mise lazygit yazi dust xh sd viddy tldr procs doggo sesh gron carapace op; do
-    command -v "$_t" >/dev/null 2>&1 || blib_say "would install: $_t"
-  done
-  unset _t
-else
-  provision
-  blib_sudo_keepalive_stop
-fi
-
-wire_links
-blib_wire_summary
-
-# ── closing report ────────────────────────────────────────────────────────────
-# Say plainly what did NOT work. The old script printed "complete" and exited 0 no matter
-# how many best-effort steps had failed, so a half-provisioned box looked identical to a
-# good one.
-# blib_failures_report prints the tally (its own and ours, via note_fail) and returns
-# non-zero when anything was recorded; --strict decides whether that is the exit code.
-if ! blib_failures_report; then
-  if ((STRICT)); then
-    blib_warn "exiting non-zero (--strict)"
-    exit 1
-  fi
-  blib_ok "Fedora bootstrap finished WITH the warnings above — open a new shell or: exec zsh"
-else
-  blib_ok "Fedora bootstrap complete — open a new shell or: exec zsh"
-fi
+blib_main "$@"
