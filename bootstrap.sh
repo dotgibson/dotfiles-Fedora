@@ -165,7 +165,7 @@ bootstrap_guard() {
 # missing — and does nothing on a real run.
 # shellcheck disable=SC2329
 bootstrap_check() {
-  ((BLIB_DRY)) || return 0
+  [[ "${BLIB_DRY:-0}" != 0 ]] || return 0 # unset on a real run under set -u; the lib reads it the same way
   blib_say "would refresh dnf metadata and install RPM Fusion (free + nonfree)"
   if [[ -f "$DOTFILES/install/packages.txt" ]]; then
     _dry_pkgs=()
