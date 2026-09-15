@@ -1,0 +1,64 @@
+name: test
+
+# The repo's own suite (`test/`), run by `make suite`.
+#
+# WHY A NEW WORKFLOW AND NOT A LEG OF AN EXISTING ONE. Every other workflow here is a
+# thin caller of a reusable in dotfiles-core — a `uses:` job cannot carry a `run:` step,
+# so there was nowhere to run a repo-owned script. check-packages.sh had a home
+# (packages.yml runs it in a pinned Fedora container per release); check-flavors.sh —
+# the atomic edition's flavour-pair test (#186) — has no package manager to wait for and
+# needs a plain runner. Same shape as dotfiles-openSUSE's test.yml.
+#
+# `make suite`, NOT `make test`. The pre-push gate `make test` is the suite plus whatever
+# the fleet floor grows; lint and core-integrity already have their own blocking
+# workflows here (lint.yml and core-integrity.yml, both reusable callers), so an
+# aggregate target would pay for the same shellcheck and core-integrity fetch a second
+# time on every PR to report the same answer.
+#
+# UBUNTU, NOT A FEDORA CONTAINER. Both scripts are written so their repo-reading half is
+# true on any host: check-flavors.sh compares the two capability declarations and greps
+# bootstrap.sh, and needs no dnf at all; check-packages.sh does its hygiene checks
+# anywhere and cleanly skips the live `dnf repoquery` where there is no dnf. The
+# AUTHORITATIVE package resolve is packages.yml (per release, on a cron as well as on
+# PRs) and bootstrap.yml's packages-check job, so pulling a Fedora image again here would
+# buy a second answer to a question already gated.
+#
+# NO PATH FILTER, deliberately, for the reason lint.yml and bootstrap.yml both record: a
+# workflow skipped by `paths:` never creates its check runs at all, so a required status
+# check on it leaves every non-matching PR stuck on "Expected — waiting for status" with
+# nothing red to fix. This job is seconds long and always runs, which is what makes it
+# safe to mark required.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: suite (test/)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # SHA-pinned rather than tag-pinned, matching bootstrap-full.yml: a mutable tag
+      # means whoever controls it controls this workflow.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The suite reads core/lib/bootstrap-lib.sh (check-packages.sh feeds the same
+      # parser bootstrap.sh feeds dnf) and core/lib/ux.sh (the palette), so a checkout
+      # whose subtree is missing must fail LOUD rather than resolve zero packages green.
+      - name: Sanity — the vendored core/ is present
+        run: test -r core/lib/bootstrap-lib.sh
+
+      - name: make suite
+        run: make suite
