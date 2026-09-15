@@ -134,6 +134,63 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Added
 
+- **The atomic edition — Silverblue, Kinoite, any `bootc` host — as a variant of the same
+  bootstrap** (#186; runbook step 3 of dotgibson/dotfiles-core's `NON-MUTABLE-HOST-PROPOSAL.md`
+  §4.6, the R4 patch measured end to end on a booted `fedora-bootc:42` guest, runs
+  34893435585 and 34895922848). On a booted ostree image `dnf install` resolves the whole
+  transaction and then refuses ("configured to be read-only"), `rpm --import` cannot lock the
+  rpmdb, and nothing installed is live until a reboot — so the old script died at its first
+  dnf line there. The marker is `/run/ostree-booted`, not `VARIANT_ID` (the bootc image
+  reports `ID=fedora` and no variant), and everything hangs off that one flag: the RPM Fusion
+  release RPMs, the package list, the lazygit COPR (a repo file into `/etc/yum.repos.d` —
+  `dnf copr` needs a plugin that is not live until a reboot), the carapace RPM and
+  `1password-cli` all **layer** with `rpm-ostree install --idempotent` into the next
+  deployment; the package list is filtered to the names `dnf repoquery` resolves and `rpm -q`
+  does not already answer, because one base-provided name refuses the whole layer even under
+  `--idempotent` (measured — it took the first 38-package layer down); 1Password's
+  fingerprint-verified key is installed under `/etc/pki/rpm-gpg` and the repo's `gpgkey`
+  points at it. A second declaration, `os/fedora.atomic.capabilities` (`PROVISIONER=atomic`,
+  the rpm-ostree verbs, `PKG_APPLY_PENDING=rpm-ostree status --pending-exit-77`, `PKG_APPLY=sudo
+  systemctl reboot`, no count verb — that question is root-only there), is relinked by
+  `bootstrap_wire_pre_loader` the way dotfiles-openSUSE selects Leap's, so Core's `up`, nudge
+  and maint runner (Core v7.6.0) see the staged host. The closing line says "N package(s)
+  layered — reboot to apply, then re-run once": the cargo/go tools behind `command -v cargo`
+  guards are skipped on the first run and picked up on the second, which is the edition's
+  measured cost (a full second deployment plus the from-source builds). 118 code lines in
+  `bootstrap.sh`, an 18-line declaration delta, no `install/` fork and no `os/*.zsh` fork —
+  the atomic edition's packages *are* Fedora's packages. `BOOTSTRAP_PROVISIONER=atomic` forces
+  the marker, which is how a container reaches the staging path at all.
+
+- **`test/check-flavors.sh`, on dotfiles-openSUSE's model, and `make suite`.** Two
+  hand-maintained declarations that are mostly identical by design are the most likely place
+  for this variant to drift, and Core's schema validator checks each file alone. The test
+  asserts the DELTA: `PROVISIONER` on the atomic file only; the five verbs dnf on one side and
+  rpm-ostree on the other (`--idempotent` on the install, `rpm-ostree upgrade` — never `bootc
+  upgrade`, which refuses a host with a layered package); the staged pair
+  (`PKG_APPLY_PENDING` / `_EXIT` agreeing on 77, `PKG_APPLY`) present only there and the count
+  keys present only on the dnf file; every other key identical both ways; and that the split
+  is still reachable — the marker probe, the CI seam, the relink and the "reboot to apply"
+  closing line survive in `bootstrap.sh`, and `os/fedora.zsh` keeps both `dnfi` arms. Runs
+  anywhere (it reads the repo), so the new `test` workflow runs it on a plain runner on every
+  PR; `make test` now runs the suite.
+
+- **`bootstrap.yml` gains a `fedora-bootc:42` leg with `provisioner: atomic`** (Core v7.7.0's
+  reusable input, dotgibson/dotfiles-core#1050). A container is not the host — the image has
+  no `/run/ostree-booted` and a writable `/usr` — so without the seam every container leg
+  walked the dnf branch and a green tick tested the wrong code (R6, measured). The forced
+  run shims rpm-ostree, makes the `rpm` shim answer `-q` with 1 so the base-image filter
+  keeps its names, and fails unless the run prints "reboot to apply"; `packages_check` runs
+  the same `dnf -q provides` (38 of 38 in that image). It is not a required check, and the
+  weekly unstubbed sweep skips it by design; `.github/core-gates.txt` declares
+  `real-bootstrap none …` with the reason, so the coverage register says VM-only rather than
+  reading green.
+
+- **`dnfi` knows the edition.** `sudo dnf install` resolves and then refuses on an atomic
+  host; the alias now reads the declaration `bootstrap.sh` linked (`_core_cap PROVISIONER`,
+  band 02 read it first) and expands to `sudo rpm-ostree install --idempotent` there. The
+  other dnf aliases are unchanged: search / provides / history are read-only and answer on
+  both editions, and upgrading is Core's `up`, which dispatches through the same declaration.
+
 - **The README opens with a rendered terminal hero** (dotgibson/dotfiles-core#948).
   `assets/demo.gif` is filmed from `assets/demo.tape`, which dotfiles-core generates from
   one shared template for all nine OS and role repos — the same tour everywhere, plus the

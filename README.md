@@ -106,6 +106,14 @@ A Fedora box (Workstation, Server, or a WSL image) and **Git**. Everything else 
 zsh, tmux, nvim, starship, and the modern-CLI stack — is provisioned by
 `bootstrap.sh`.
 
+**The atomic edition** — Silverblue, Kinoite, or any `bootc` host — is the same
+bootstrap as a variant: it detects `/run/ostree-booted` and *layers* the same package
+list with `rpm-ostree` instead of installing it live. Nothing layered is on `PATH` until
+you reboot, so a fresh atomic box takes **two runs**: `./bootstrap.sh`, reboot when it
+tells you to, then `./bootstrap.sh` once more so the cargo/go tools build against the
+layered toolchain. That second run is the measured cost of the edition — a full second
+deployment plus the from-source builds on top of it.
+
 ### Installation
 
 ```bash
@@ -147,14 +155,20 @@ are always backed up to `<file>.pre-dotfiles.<epoch>` before being replaced.
 Only what changes with the OS. The heavy lifting — the shell modules, editor, and
 prompt — comes from vendored Core; this repo owns the Fedora specifics:
 
-- `bootstrap.sh` — `dnf` provision + Core/OS symlink wiring (idempotent)
+- `bootstrap.sh` — `dnf` provision (`rpm-ostree` layering on the atomic edition) +
+  Core/OS symlink wiring (idempotent)
 - `install/packages.txt` — the `dnf` package list (modern CLI stack), verified against
   every supported Fedora release by the `packages` workflow
 - `os/fedora.zsh` — clipboard + package-manager aliases → `~/.config/zsh/80-os.zsh`
+- `os/fedora.capabilities` / `os/fedora.atomic.capabilities` — the dnf and rpm-ostree
+  declarations Core's `up`, update nudge and maint runner dispatch through; `bootstrap.sh`
+  links whichever matches the box, and `test/check-flavors.sh` gates the delta between them
 - `os/fedora.conf` / `os/fedora.gitconfig` — the tmux + git OS overlays
 - `wsl/wsl.conf` — the WSL boot config (systemd, default user, interop)
 - `aliases.md` — the Fedora alias cheat sheet (dotfiles-core's
   [`aliases.md`](https://github.com/dotgibson/dotfiles-core/blob/main/aliases.md) covers the universal ones)
+- `test/` — the repo's own suite (`make suite`): the flavour-pair test and the package
+  resolver, run on every PR by the `test` workflow
 - `core/` — vendored from `dotfiles-core` (read-only here; edit upstream)
 
 The things that actually bite on Fedora — dnf5, RPM Fusion, the Wayland clipboard

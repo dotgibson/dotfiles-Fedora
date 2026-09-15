@@ -32,7 +32,12 @@ What belongs **here** is only the OS-native layer: the `dnf` package list, clipb
 - `os/fedora.zsh` — clipboard + package-manager aliases for Fedora
 - `os/fedora.conf`, `os/fedora.gitconfig` — tmux + git OS overlays
 - `install/packages.txt` — Fedora package names
-- `bootstrap.sh` — symlinks Core + OS files into place
+- `os/fedora.capabilities`, `os/fedora.atomic.capabilities` — the dnf and the rpm-ostree
+  (Silverblue / Kinoite / bootc) declarations; `bootstrap.sh` links the one that matches the
+  box, and `test/check-flavors.sh` gates the delta between them
+- `bootstrap.sh` — provisions (dnf, or `rpm-ostree` layering on an atomic host) and
+  symlinks Core + OS files into place
+- `test/` — the repo's own suite (`make suite`): the flavour-pair test + the package resolver
 - `core/` — vendored Core (read-only here; edit upstream in dotfiles-core)
 
 ## Attribution: keep the tooling out of the record
