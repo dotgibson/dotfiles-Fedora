@@ -76,7 +76,16 @@ jobs:
     uses: dotgibson/dotfiles-core/.github/workflows/bootstrap-test.yml@v7
     with:
       image: quay.io/fedora/fedora-bootc:42
-      prep: "dnf install -y -q bash zsh"
+      # The second half of the prep is the bootc image's, not Fedora's. On an ostree/bootc
+      # image /root is a symlink into /var (var/roothome), and a container has not booted:
+      # nothing ran systemd-tmpfiles, so the target does not exist and the link dangles.
+      # The reusable's very next line after the prep is `mkdir -p "$HOME/.config/…"` (the
+      # tpm pre-seed), which fails on a dangling symlink with "cannot create directory
+      # '/root': File exists" — measured on this leg's first run (both links-only and
+      # provision-stub, 35025274890). The prep runs inside the same container as root, so
+      # it can create the directory the link points at; readlink -f resolves the link
+      # whether or not its target exists, so this does not hard-code /var/roothome.
+      prep: 'dnf install -y -q bash zsh && mkdir -p "$(readlink -f "$HOME")"'
       provision_stub: true
       provisioner: atomic
       packages_check: dnf -q provides
