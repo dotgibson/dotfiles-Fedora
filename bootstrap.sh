@@ -122,6 +122,20 @@ os_guard() {
 IS_WSL=0
 if blib_is_wsl; then IS_WSL=1; fi
 
+# ── atomic edition? (Silverblue / Kinoite / a bootc host) ─────────────────────
+# /run/ostree-booted is the marker ostree leaves on a booted image. It is the test — not
+# VARIANT_ID: fedora-bootc:42 reports ID=fedora and NO VARIANT_ID (measured), so the guard
+# above passes on ID alone and only the marker says the root is read-only. Everything the
+# atomic edition changes hangs off this one flag: the declaration it links, how packages
+# are installed (layered into the NEXT deployment, live after a reboot), and the closing
+# line that says so.
+IS_ATOMIC=0
+[[ -e /run/ostree-booted ]] && IS_ATOMIC=1
+# CI's seam (R6): a container has no /run/ostree-booted, so the stubbed-provision leg could
+# never reach the staging path; BOOTSTRAP_PROVISIONER=atomic forces it, with rpm-ostree shimmed.
+[[ "${BOOTSTRAP_PROVISIONER:-}" == atomic ]] && IS_ATOMIC=1
+ATOMIC_STAGED=0 # packages layered this run — the closing hint says "reboot" only when non-zero
+
 # priv <cmd...> — run CMD under the escalator blib_main resolved (BLIB_SU: an absolute path,
 # or empty when root). Never invokes an empty-string command.
 priv() {
@@ -137,6 +151,7 @@ preflight_cmds() {
   # must not demand git — the reusable CI test provisions only `bash zsh` and pre-seeds the
   # tpm dir precisely so the wiring path stays offline and deterministic.
   ((BLIB_LINKS_ONLY)) || need=(dnf rpm curl sed awk)
+  ((IS_ATOMIC)) && ((!BLIB_LINKS_ONLY)) && need+=(rpm-ostree)
   local c
   for c in "${need[@]}"; do
     command -v "$c" >/dev/null 2>&1 || missing+=("$c")
@@ -166,11 +181,19 @@ bootstrap_guard() {
 # shellcheck disable=SC2329
 bootstrap_check() {
   [[ "${BLIB_DRY:-0}" != 0 ]] || return 0 # unset on a real run under set -u; the lib reads it the same way
-  blib_say "would refresh dnf metadata and install RPM Fusion (free + nonfree)"
+  if ((IS_ATOMIC)); then
+    blib_say "atomic edition: would layer RPM Fusion (free + nonfree) with rpm-ostree"
+  else
+    blib_say "would refresh dnf metadata and install RPM Fusion (free + nonfree)"
+  fi
   if [[ -f "$DOTFILES/install/packages.txt" ]]; then
     _dry_pkgs=()
     mapfile -t _dry_pkgs < <(blib_read_pkgs "$DOTFILES/install/packages.txt")
-    blib_say "would dnf install ${#_dry_pkgs[@]} packages: ${_dry_pkgs[*]}"
+    if ((IS_ATOMIC)); then
+      blib_say "would rpm-ostree install --idempotent ${#_dry_pkgs[@]} packages into the NEXT deployment (live after a reboot): ${_dry_pkgs[*]}"
+    else
+      blib_say "would dnf install ${#_dry_pkgs[@]} packages: ${_dry_pkgs[*]}"
+    fi
   else
     blib_warn "install/packages.txt is missing — a real run would abort here"
   fi
@@ -220,16 +243,30 @@ bootstrap_provision() {
     exit 1
   }
 
-  blib_say "dnf metadata refresh (makecache)"
-  priv dnf -y makecache >/dev/null
-
-  blib_say "RPM Fusion (free + nonfree)"
   local rel
   rel="$(rpm -E %fedora)"
-  priv dnf -y install \
-    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${rel}.noarch.rpm" \
-    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${rel}.noarch.rpm" \
-    >/dev/null || note_fail "RPM Fusion repos not added (already present, or the release RPM 404'd for F${rel})"
+  if ((IS_ATOMIC)); then
+    # ── atomic: everything below LAYERS into the next deployment ──────────────
+    # `dnf install` on a booted ostree/bootc host resolves the whole transaction and then
+    # refuses ("this bootc system is configured to be read-only" — measured). The honest
+    # verb is rpm-ostree: it layers into a NEW deployment that is live after a reboot, so
+    # nothing installed here is on PATH during this run. --idempotent makes a re-run over
+    # already-layered packages a no-op instead of an error.
+    blib_say "RPM Fusion (free + nonfree) — layered"
+    priv rpm-ostree install --idempotent \
+      "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${rel}.noarch.rpm" \
+      "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${rel}.noarch.rpm" \
+      >/dev/null || note_fail "RPM Fusion release RPMs not layered (already in the base image, or the release RPM 404'd for F${rel})"
+  else
+    blib_say "dnf metadata refresh (makecache)"
+    priv dnf -y makecache >/dev/null
+
+    blib_say "RPM Fusion (free + nonfree)"
+    priv dnf -y install \
+      "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${rel}.noarch.rpm" \
+      "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${rel}.noarch.rpm" \
+      >/dev/null || note_fail "RPM Fusion repos not added (already present, or the release RPM 404'd for F${rel})"
+  fi
 
   blib_say "dnf packages (from install/packages.txt)"
   local -a pkgs=()
@@ -247,7 +284,33 @@ bootstrap_provision() {
   # Guard the empty case: an all-comment/blank packages.txt yields a zero-length
   # array, and `dnf install` with no args errors out — aborting the whole bootstrap
   # under `set -e`. Skip the install instead and carry on with the rest.
-  if ((${#pkgs[@]})); then
+  if ((${#pkgs[@]})) && ((IS_ATOMIC)); then
+    # rpm-ostree has no --skip-unavailable: one unknown name fails the whole layering.
+    # dnf's metadata is readable on the host (only its transaction is refused), so ask it
+    # which of the requested names resolve, and layer exactly those. Already-in-base names
+    # are fine under --idempotent.
+    local -a avail=() todo=() p
+    mapfile -t avail < <(dnf -q repoquery --qf '%{name}\n' "${pkgs[@]}" 2>/dev/null | sort -u)
+    ((${#avail[@]})) || avail=("${pkgs[@]}") # metadata unreadable: let rpm-ostree be the judge
+    if ((${#avail[@]} < ${#pkgs[@]})); then
+      blib_warn "$((${#pkgs[@]} - ${#avail[@]})) of ${#pkgs[@]} requested names are not in the enabled repos and are skipped"
+    fi
+    # Names the BASE IMAGE already provides must not be requested either: rpm-ostree
+    # refuses them outright ("curl is already provided by … Use --allow-inactive") and
+    # --idempotent only forgives packages already LAYERED (measured: one base-provided
+    # name failed the whole 38-package layer). rpm -q reads the booted deployment's db.
+    for p in "${avail[@]}"; do rpm -q "$p" >/dev/null 2>&1 || todo+=("$p"); done
+    avail=("${todo[@]}")
+    ((${#avail[@]})) || { blib_ok "rpm-ostree: every requested package is already in the base image or layered"; }
+    if ((${#avail[@]})); then
+      if priv rpm-ostree install --idempotent "${avail[@]}"; then
+        ATOMIC_STAGED=$((ATOMIC_STAGED + ${#avail[@]}))
+        blib_ok "rpm-ostree: ${#avail[@]} packages layered into the next deployment (${#pkgs[@]} requested)"
+      else
+        note_fail "rpm-ostree install failed — retry later: ${BLIB_SU:+$BLIB_SU }rpm-ostree install --idempotent ${avail[*]}"
+      fi
+    fi
+  elif ((${#pkgs[@]})); then
     priv dnf -y install --skip-unavailable "${pkgs[@]}"
     blib_ok "dnf packages installed (${#pkgs[@]} requested)"
   else
@@ -405,10 +468,21 @@ bootstrap_provision() {
     # stderr stays VISIBLE on every privileged call from here down (only stdout is
     # silenced). Hiding it is what made a mid-run sudo prompt invisible; it also hid the
     # reason a COPR install failed.
+    if ((IS_ATOMIC)); then
+      # `dnf copr enable` needs the dnf5-plugins layer, which is not live until a reboot;
+      # the COPR repo file is one curl into the writable /etc, then lazygit layers.
+      priv sh -c "curl -fsSL 'https://copr.fedorainfracloud.org/coprs/atim/lazygit/repo/fedora-${rel}/atim-lazygit-fedora-${rel}.repo' -o /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:atim:lazygit.repo" >/dev/null 2>&1 || true
+      if priv rpm-ostree install --idempotent lazygit >/dev/null; then
+        ATOMIC_STAGED=$((ATOMIC_STAGED + 1))
+      else
+        note_fail "lazygit: COPR layer failed — retry later: ${BLIB_SU:+$BLIB_SU }rpm-ostree install lazygit"
+      fi
+    else
     priv dnf -y install dnf5-plugins >/dev/null || true
     priv dnf -y copr enable atim/lazygit >/dev/null || true
     priv dnf -y install lazygit >/dev/null ||
       note_fail "lazygit: COPR install failed — retry later: ${BLIB_SU:+$BLIB_SU }dnf copr enable atim/lazygit && ${BLIB_SU:+$BLIB_SU }dnf install lazygit"
+    fi
   fi
 
   # ── doctor-probed tools not (reliably) in Fedora repos ─────────────────────
@@ -531,8 +605,16 @@ bootstrap_provision() {
         grep -o "\"browser_download_url\": *\"[^\"]*linux_${_cara_arch}\.rpm\"" |
         cut -d'"' -f4 | head -1)" || true
       if [[ -n "$_cara_url" ]]; then
-        priv dnf -y install "$_cara_url" >/dev/null ||
-          note_fail "carapace: RPM install failed — retry later: ${BLIB_SU:+$BLIB_SU }dnf install $_cara_url"
+        if ((IS_ATOMIC)); then
+          if priv rpm-ostree install --idempotent "$_cara_url" >/dev/null; then
+            ATOMIC_STAGED=$((ATOMIC_STAGED + 1))
+          else
+            note_fail "carapace: RPM layer failed — retry later: ${BLIB_SU:+$BLIB_SU }rpm-ostree install $_cara_url"
+          fi
+        else
+          priv dnf -y install "$_cara_url" >/dev/null ||
+            note_fail "carapace: RPM install failed — retry later: ${BLIB_SU:+$BLIB_SU }dnf install $_cara_url"
+        fi
       else
         note_fail "carapace: could not resolve the latest linux_${_cara_arch} RPM (offline? API rate-limited?) — see github.com/carapace-sh/carapace-bin/releases"
       fi
@@ -596,19 +678,38 @@ bootstrap_provision() {
       rm -f "$_op_key"
       _op_key=""
     fi
-    if [[ -n "$_op_key" ]] && priv rpm --import "$_op_key" >/dev/null; then
+    # The rpmdb is read-only on an atomic host ("can't create transaction lock on
+    # /usr/share/rpm/.rpm.lock" — measured), so `rpm --import` cannot run there. The
+    # VERIFIED key file goes to /etc/pki/rpm-gpg instead and the repo points at it;
+    # rpm-ostree imports a repo's gpgkey itself when it layers from it.
+    local _op_gpgkey="https://downloads.1password.com/linux/keys/1password.asc"
+    if ((IS_ATOMIC)); then
+      _op_gpgkey="file:///etc/pki/rpm-gpg/RPM-GPG-KEY-1password"
+      [[ -n "$_op_key" ]] && { priv install -D -m 0644 "$_op_key" /etc/pki/rpm-gpg/RPM-GPG-KEY-1password >/dev/null || { rm -f "$_op_key"; _op_key=""; }; }
+    elif [[ -n "$_op_key" ]] && ! priv rpm --import "$_op_key" >/dev/null; then
+      rm -f "$_op_key"; _op_key=""
+    fi
+    if [[ -n "$_op_key" ]]; then
       rm -f "$_op_key"
-      priv sh -c 'cat >/etc/yum.repos.d/1password.repo' <<'REPO' || true
+      priv sh -c "cat >/etc/yum.repos.d/1password.repo" <<REPO || true
 [1password]
 name=1Password Stable Channel
-baseurl=https://downloads.1password.com/linux/rpm/stable/$basearch
+baseurl=https://downloads.1password.com/linux/rpm/stable/\$basearch
 enabled=1
 gpgcheck=1
 repo_gpgcheck=1
-gpgkey=https://downloads.1password.com/linux/keys/1password.asc
+gpgkey=$_op_gpgkey
 REPO
-      priv dnf -y install 1password-cli >/dev/null ||
-        note_fail "op: install failed; see developer.1password.com/docs/cli/get-started"
+      if ((IS_ATOMIC)); then
+        if priv rpm-ostree install --idempotent 1password-cli >/dev/null; then
+          ATOMIC_STAGED=$((ATOMIC_STAGED + 1))
+        else
+          note_fail "op: layer failed; see developer.1password.com/docs/cli/get-started"
+        fi
+      else
+        priv dnf -y install 1password-cli >/dev/null ||
+          note_fail "op: install failed; see developer.1password.com/docs/cli/get-started"
+      fi
     else
       rm -f "$_op_key"
       note_fail "op: signing key not imported — skipping the repo (an unverifiable repo breaks every later dnf transaction); see developer.1password.com/docs/cli/get-started"
@@ -655,6 +756,30 @@ REPO
     flatpak remote-add --if-not-exists flathub \
       https://flathub.org/repo/flathub.flatpakrepo >/dev/null 2>&1 || true
   fi
+}
+
+# ── the atomic edition's declaration ──────────────────────────────────────────
+# blib_link_os_layer has just linked os/fedora.capabilities — the dnf one. On an atomic
+# host the install and upgrade verbs stage and a reboot applies, which is a different
+# declaration (os/fedora.atomic.capabilities); relink it here, the way dotfiles-openSUSE
+# selects its Leap declaration. A declaration is data and cannot probe; this hook can.
+# shellcheck disable=SC2329
+bootstrap_wire_pre_loader() {
+  if ((IS_ATOMIC)); then
+    blib_say "atomic edition detected — using the rpm-ostree capability declaration (staged install/upgrade, reboot applies)"
+    blib_link "$DOTFILES/os/fedora.atomic.capabilities" "$CONFIG/zsh/os.capabilities"
+  fi
+}
+
+# What only this repo knows at the end: on an atomic host the packages are layered, not
+# live, and the cargo/go tools that need the layered toolchain were skipped by their
+# presence guards. The driver prints the tally; this says what to do next.
+# shellcheck disable=SC2329
+bootstrap_closing() {
+  if ((ATOMIC_STAGED)); then
+    blib_warn "$ATOMIC_STAGED package(s) layered into the next deployment — reboot to apply (${BLIB_SU:+$BLIB_SU }systemctl reboot), then re-run ./bootstrap.sh once so the cargo/go tools build against the layered toolchain"
+  fi
+  return 0
 }
 
 blib_main "$@"

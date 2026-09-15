@@ -5,15 +5,19 @@ reference (modern CLI, git, safety nets) that applies on every machine.
 
 ## Package Management (dnf)
 
-| Alias      | Expands to                                            |
-| ---------- | ----------------------------------------------------- |
-| `dnfi`     | `sudo dnf install`                                    |
-| `dnfs`     | `dnf search`                                          |
-| `dnfu`     | `sudo dnf upgrade --refresh`                          |
-| `dnfr`     | `sudo dnf remove`                                     |
-| `dnfh`     | `dnf history`                                         |
-| `dnfwhat`  | `dnf provides` (what package provides a file/command) |
-| `dnf-undo` | Undo last dnf transaction (function)                  |
+| Alias      | Expands to                                                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dnfi`     | `sudo dnf install` — on the atomic edition (Silverblue / Kinoite / bootc) `sudo rpm-ostree install --idempotent`, which layers; reboot to apply |
+| `dnfs`     | `dnf search`                                                                                                                                    |
+| `dnfu`     | `sudo dnf upgrade --refresh`                                                                                                                    |
+| `dnfr`     | `sudo dnf remove`                                                                                                                               |
+| `dnfh`     | `dnf history`                                                                                                                                   |
+| `dnfwhat`  | `dnf provides` (what package provides a file/command)                                                                                           |
+| `dnf-undo` | Undo last dnf transaction (function)                                                                                                            |
+
+`dnfi` reads the capability declaration `bootstrap.sh` linked (`PROVISIONER=atomic` on the
+atomic edition) rather than probing the host itself. The other dnf aliases are the dnf
+edition's; on an atomic box `up` (Core) upgrades through the same declaration.
 
 ## Flatpak
 

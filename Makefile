@@ -12,7 +12,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 .DEFAULT_GOAL := help
 .PHONY: help lint shellcheck syntax zsh-syntax markdown check dry-run links-only \
-        packages-check core-verify integrity test hooks clean capabilities
+        packages-check core-verify integrity suite test hooks clean capabilities
 
 # Repo-owned shell only — core/ is gated upstream. Mirrors the reusable gate's
 # `git ls-files '*.sh' ':!:core/**'`.
@@ -117,8 +117,21 @@ core-verify: ## Verify the vendored core/ is pristine vs core.lock (needs a sibl
 
 integrity: core-verify ## (alias) kept for muscle memory — the canonical name is core-verify
 
-test: ## Run this repo's behavioural checks (the fleet test floor)
-	@./test/check-packages.sh install/packages.txt
+suite: ## Run the repo's own suite (test/*.sh) — no linters, no network
+	@# Every script under test/ is self-guarding: check-packages.sh skips cleanly where
+	@# there is no dnf, and check-flavors.sh reads only the repo. So the suite is true on
+	@# any host, which is what lets .github/workflows/test.yml run it on a plain runner.
+	@# An EMPTY suite is a failure, not a pass — the fleet floor is "at least one script".
+	@rc=0; found=0; \
+	for t in test/*.sh; do \
+	  [ -f "$$t" ] || continue; found=1; \
+	  echo ":: $$t"; \
+	  bash "$$t" || rc=1; \
+	done; \
+	if [ "$$found" -eq 0 ]; then echo "!! no test/*.sh — the suite is empty"; exit 1; fi; \
+	exit $$rc
+
+test: suite ## Run this repo's behavioural checks (the fleet test floor)
 
 hooks: ## Install the pre-commit hooks into this clone
 	@command -v pre-commit >/dev/null 2>&1 || { echo "pre-commit not installed: pip install pre-commit"; exit 1; }

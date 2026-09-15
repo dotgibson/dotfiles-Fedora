@@ -50,7 +50,24 @@ fi
 # ── Fedora ships fd as `fd` (not fdfind) — 00-tools.zsh already resolved this. ───
 
 # ── dnf quality-of-life (dnf5 default since F41; commands are identical) ──────
-alias dnfi='sudo dnf install'
+# `dnfi` IS EDITION-AWARE. On the atomic edition (Silverblue, Kinoite, any bootc host)
+# `dnf install` resolves the whole transaction and then refuses ("configured to be
+# read-only" — measured, dotgibson/dotfiles-core NON-MUTABLE-HOST-PROPOSAL.md); the install
+# verb there is rpm-ostree, which LAYERS into the next deployment and is live after a
+# reboot. Which edition this is was decided once, by bootstrap.sh, and is written in the
+# declaration it linked: os/fedora.atomic.capabilities declares PROVISIONER=atomic, the
+# dnf one declares no PROVISIONER at all. Band 02 read that file before this fragment, so
+# ask it (Core's accessor) rather than re-probe /run/ostree-booted here — the declaration
+# is the one place the answer lives. The guard on the function is for a shell whose Core
+# predates the accessor; it falls through to the dnf alias, which is what it had before.
+# The other aliases stay as they are: search / provides / history are read-only and answer
+# on both editions, and the upgrade verb is Core's `up`, which dispatches through the same
+# declaration's PKG_UPGRADE (`rpm-ostree upgrade` there — staged, reboot to apply).
+if (( $+functions[_core_cap] )) && [[ "$(_core_cap PROVISIONER)" == atomic ]]; then
+  alias dnfi='sudo rpm-ostree install --idempotent'   # layers into the next deployment
+else
+  alias dnfi='sudo dnf install'
+fi
 alias dnfs='dnf search'
 alias dnfu='sudo dnf upgrade --refresh'
 alias dnfr='sudo dnf remove'

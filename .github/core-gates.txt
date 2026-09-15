@@ -1,0 +1,20 @@
+# .github/core-gates.txt — how this repo satisfies dotfiles-core's reusable gates.
+#
+# ONE LINE PER GATE THIS REPO DOES NOT CALL. Anything that calls the reusable workflow is
+# derived from its own `uses:` line and needs no entry here (dotgibson/dotfiles-core#607).
+#
+#   <gate> own  <how it is satisfied here>
+#   <gate> none <why this repo does not need it>
+#
+# The value is entirely in these lines: without them a rollout audit cannot tell
+# "not covered" from "covered elsewhere", which has already produced two issues filed in
+# good faith against gates this repo does satisfy (#154, #178).
+#
+# `real-bootstrap` is the one gate that is not a reusable workflow: the weekly unstubbed
+# sweep derives its legs from bootstrap.yml's callers (dotgibson/dotfiles-core#1050). The
+# fedora:latest leg IS swept, so the register reads `sweep` here; this line is for the
+# other leg. The fedora-bootc:42 caller declares `provisioner: atomic`, and the sweep skips
+# it by design — a container has no /run/ostree-booted and a writable /usr, so an unstubbed
+# run there would install down the dnf branch and read green off the wrong code.
+
+real-bootstrap none the staging verb needs a booted host; the fedora:latest leg is swept, the fedora-bootc:42 leg (provisioner: atomic) is VM-only — dotfiles-core's research-nonmutable-vm.yml covers it on demand (NON-MUTABLE-HOST-PROPOSAL.md §4.4)

@@ -52,3 +52,40 @@ jobs:
       packages_check: dnf -q provides
       # packages_file is left at its default (install/packages.txt) — this repo's list
       # needs no pre-filtering, unlike dotfiles-Debian's per-distro annotations.
+
+  # ── the atomic edition (Silverblue / Kinoite / bootc) — the variant's own leg ────────
+  # bootstrap.sh grows a second branch on an ostree/bootc host (#186, dotgibson/dotfiles-core
+  # NON-MUTABLE-HOST-PROPOSAL.md §4.3): packages LAYER with rpm-ostree into the next
+  # deployment instead of installing live. A container cannot reach that branch on its
+  # own — fedora-bootc:42 as an image has no /run/ostree-booted and a writable /usr, so a
+  # plain run walks the dnf path above and a green tick here would test the wrong code
+  # (R6, measured). `provisioner: atomic` is the reusable's seam for exactly that: it
+  # exports BOOTSTRAP_PROVISIONER into the stubbed run (the marker bootstrap.sh honours
+  # beside the real one), shims rpm-ostree, makes the `rpm` shim answer `-q` with 1 so the
+  # "already in the base image" filter keeps its names, and FAILS the leg unless the run
+  # prints the staged closing line ("reboot to apply"). Same package list, same resolver
+  # verb: the atomic edition's packages are Fedora's packages, and bootc reads Fedora's
+  # repos (38 of 38 resolved there, run 34945498882).
+  #
+  # NOT a required status check — the required pair is `test / lint` + `test / links-only`
+  # above. And NOT in the weekly unstubbed real-bootstrap sweep: it skips a caller that
+  # declares `provisioner:` (the container would install down the dnf branch), names the
+  # leg VM-only, and .github/core-gates.txt says why. The staging verb itself is measured
+  # on a booted guest by dotfiles-core's research-nonmutable-vm.yml, on demand.
+  atomic:
+    uses: dotgibson/dotfiles-core/.github/workflows/bootstrap-test.yml@v7
+    with:
+      image: quay.io/fedora/fedora-bootc:42
+      # The second half of the prep is the bootc image's, not Fedora's. On an ostree/bootc
+      # image /root is a symlink into /var (var/roothome), and a container has not booted:
+      # nothing ran systemd-tmpfiles, so the target does not exist and the link dangles.
+      # The reusable's very next line after the prep is `mkdir -p "$HOME/.config/…"` (the
+      # tpm pre-seed), which fails on a dangling symlink with "cannot create directory
+      # '/root': File exists" — measured on this leg's first run (both links-only and
+      # provision-stub, 35025274890). The prep runs inside the same container as root, so
+      # it can create the directory the link points at; readlink -f resolves the link
+      # whether or not its target exists, so this does not hard-code /var/roothome.
+      prep: 'dnf install -y -q bash zsh && mkdir -p "$(readlink -f "$HOME")"'
+      provision_stub: true
+      provisioner: atomic
+      packages_check: dnf -q provides
