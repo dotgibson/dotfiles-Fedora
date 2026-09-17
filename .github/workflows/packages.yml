@@ -14,6 +14,14 @@
 # container for each release. It also validates the inverse claim — that the cargo/go
 # fallbacks in bootstrap.sh are covering names dnf can no longer supply.
 #
+# IT ALSO CHECKS THE `# min:` VERSION FLOORS, and those run the OPPOSITE way round from
+# the name check: a name that stops resolving on rawhide is early warning (advisory),
+# while a FLOOR unmet on rawhide is a dead end (exit 3) — rawhide is the newest Fedora
+# there is, so below a floor there means the requirement is unsatisfiable fleet-wide. On a
+# numbered release an unmet floor is a documented fact that dnf cannot fix, so it is
+# reported, not failed. The script keys that tier on RELEASE, never on `blocking:` below —
+# one knob cannot spell two opposite policies. Do NOT add a `floor_blocking:` input.
+#
 # NOT a required status check: it is matrix-heavy and path-filtered, and a required check
 # that never runs would deadlock every unrelated PR.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -21,6 +29,15 @@ name: packages
 
 on:
   pull_request:
+    # bootstrap.sh is deliberately NOT in this filter, although it now holds the
+    # authoritative TREESITTER_FLOOR / NEOVIM_FLOOR values. It is the file nearly every PR
+    # here touches, so listing it would spin four Fedora containers up on almost every PR
+    # to re-answer a question test.yml already answers for free: that workflow has no path
+    # filter, runs `make suite` on every PR, and test/check-packages.sh performs the
+    # floor-vs-bootstrap.sh agreement assertion ABOVE its `dnf` guard precisely so it fires
+    # on a plain ubuntu runner. A change that can move a floor VERDICT (rather than just
+    # delete a floor) has to edit install/packages.txt too — the assertion forces the two
+    # to match — and install/packages.txt IS in this filter.
     paths: ['install/packages.txt', '.github/workflows/packages.yml']
   push:
     branches: [main]

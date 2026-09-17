@@ -58,7 +58,18 @@ du-dust        # dust (du) — Fedora's package name; installs the `dust` binary
 # so once F45 drops the names the transaction skips them instead of failing.
 
 # ── editor + git workflow ─────────────────────────────────────
-neovim
+neovim           # min:0.12.0 — nvim-treesitter (core/nvim, pinned to `main`) will not
+                 # merely prefer 0.12, it will not LOAD below it. dnf resolves `neovim` on
+                 # every lane but only CLEARS this floor on three: F44/F45/rawhide ship
+                 # 0.12.5; F43 ships 0.11.6 and does NOT. F44 crossed 0.11 → 0.12 inside
+                 # the release (the 0.12.5 is in `updates`, not at GA) — F43 stayed on the
+                 # 0.11 branch and ends its life there, so there is no dnf fix for it.
+                 # This floor and tree-sitter-cli's below are two halves of ONE
+                 # requirement; only the tree-sitter half used to be recorded (#192).
+                 # The authoritative VALUE is NEOVIM_FLOOR in bootstrap.sh, which WARNS on
+                 # a short box rather than pretending to fix it (unlike the tree-sitter
+                 # half, there is no cargo crate that ships nvim); test/check-packages.sh
+                 # asserts the two agree, so this copy cannot silently drift.
 git
 git-subtree      # `git subtree` ships as a SEPARATE package on Fedora (architecture needs it)
 openssh-clients  # ssh / ssh-keygen / ssh-agent — Workstation has it; minimal/Server may not
@@ -81,11 +92,18 @@ cargo          # rust toolchain -> backstops every `cargo install` in bootstrap.
 # ── Neovim provider deps (fix :checkhealth; use dnf NOT pip — F44 python is PEP668-managed)
 python3-neovim # pynvim — the Python 3 provider module
 python3-pip    # pip for the system python
-tree-sitter-cli # nvim-treesitter (main branch) compiles parsers locally — needs the CLI ≥0.26.1.
-                # F44/F45/rawhide ship 0.26.11 and clear that floor; F43 ships 0.25.10 and does
-                # NOT — on F43 the packaged CLI is too old for the main branch.
-                # If :checkhealth nvim-treesitter flags it as too old, drop it from this list and
-                # install current via mise (`mise use -g tree-sitter`) or `cargo install tree-sitter-cli`.
+tree-sitter-cli # min:0.26.1 — nvim-treesitter (main branch) compiles parsers locally and
+                # needs the CLI at or above this. The floor was recorded here in PROSE long
+                # before it was machine-readable, which is why nothing checked it (#192).
+                # F44/F45/rawhide ship 0.26.11 and clear it; F43 ships 0.25.10 and does NOT.
+                # Keep the name listed anyway: it resolves on every lane and is the right
+                # build on the three where it clears. bootstrap.sh covers the fourth — its
+                # guard is VERSION-checked, not presence-checked, because dnf's 0.25.10
+                # satisfies `command -v tree-sitter` and a presence guard would skip the
+                # cargo build and leave the box below the floor in silence. The
+                # authoritative VALUE is TREESITTER_FLOOR in bootstrap.sh, which builds the
+                # crate into ~/.cargo/bin (prepended ahead of /usr/bin, so it shadows the
+                # RPM); test/check-packages.sh asserts the two agree.
 # rust-analyzer  # uncomment if you use the Rust LSP (rustaceanvim wants it)
 # golang         # uncomment if you want the Go LSP (gopls) + Go tooling
 
