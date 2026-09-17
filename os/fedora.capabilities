@@ -29,6 +29,12 @@ PKG_SEARCH=dnf search
 PKG_OWNS=dnf provides
 PKG_COUNT_PENDING=dnf -q --refresh check-update
 
+# ── what --packages must not nag about (#1087) ────────────────────────────────
+# Every verb above runs `dnf`, which Fedora ships as part of the base system.
+# install/packages.txt lists what this repo ADDS to a box, so naming the package
+# manager there would be listing the thing doing the installing.
+PKG_UNLISTED_TOOLS=dnf
+
 # ── scheduler (required) ──────────────────────────────────────────────────────
 SCHEDULER=systemd
 SCHEDULER_UNIT_DIR=~/.config/systemd/user
