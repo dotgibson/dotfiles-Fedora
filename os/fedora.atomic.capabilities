@@ -39,6 +39,12 @@ PKG_APPLY_PENDING_EXIT=77
 # ── the staged change becomes live ────────────────────────────────────────────
 PKG_APPLY=sudo systemctl reboot
 
+# ── what --packages must not nag about (#1087) ────────────────────────────────
+# Four base-system binaries across this edition's verbs, none of them in packages.txt:
+# `rpm-ostree` stages, `dnf` and `rpm` query, and `systemctl` is what the staged change
+# becomes live through.
+PKG_UNLISTED_TOOLS=rpm-ostree dnf rpm systemctl
+
 # ── scheduler (required) ──────────────────────────────────────────────────────
 SCHEDULER=systemd
 SCHEDULER_UNIT_DIR=~/.config/systemd/user

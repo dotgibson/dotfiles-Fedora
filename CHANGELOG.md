@@ -134,6 +134,20 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Added
 
+- **`make lint` stops warning about `dnf` on every package verb**
+  (dotgibson/dotfiles-core#1087, dotgibson/dotfiles-core#1104). Core's capability
+  cross-check warns when a `PKG_*` verb's leading binary is absent from
+  `install/packages.txt`. Both declarations here run base-system binaries the list
+  deliberately does not name — that file records what this repo ADDS to a box — so the
+  check fired on **8 verbs in each**, burying the one case it exists to catch: a verb
+  naming a tool nothing installs. `PKG_UNLISTED_TOOLS` declares the exceptions (`dnf` on
+  the workstation edition, `rpm-ostree dnf rpm systemctl` on the atomic one) and both
+  declarations now validate with zero warnings.
+
+  Kept honest from both ends, so it cannot rot into a blanket silencer: a name no declared
+  verb runs is a FAILURE, and so is a name `packages.txt` actually installs. Needs Core
+  **≥ 7.10.0** vendored — an older validator rejects the key outright.
+
 - **The atomic edition — Silverblue, Kinoite, any `bootc` host — as a variant of the same
   bootstrap** (#186; runbook step 3 of dotgibson/dotfiles-core's `NON-MUTABLE-HOST-PROPOSAL.md`
   §4.6, the R4 patch measured end to end on a booted `fedora-bootc:42` guest, runs
