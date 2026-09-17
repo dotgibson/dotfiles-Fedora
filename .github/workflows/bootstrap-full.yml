@@ -97,7 +97,13 @@ jobs:
           echo "$out" | tail -20
           # The regression that made every re-run cost minutes: a PATH-only presence guard
           # reporting "missing" for tools installed under $HOME/.cargo/bin or $HOME/.local/bin.
-          if echo "$out" | grep -qE '^\S*\s*(dust|xh|sd|viddy|tealdeer|procs|yazi) \(cargo'; then
+          # tree-sitter-cli is in the list although its guard is VERSION-checked rather than
+          # presence-checked: on a second run _dotfiles_ts_meets_floor finds the binary the
+          # first run built at ~/.cargo/bin and skips, so a rebuild here means that probe
+          # regressed. It never fires on fedora:latest (the RPM already clears the floor);
+          # it does on a workflow_dispatch pinned to fedora:43, which is the case that needs
+          # the assertion most.
+          if echo "$out" | grep -qE '^\S*\s*(dust|xh|sd|viddy|tealdeer|procs|yazi|tree-sitter-cli) \(cargo'; then
             echo "::error::second run rebuilt a cargo tool — the presence guards regressed"
             exit 1
           fi

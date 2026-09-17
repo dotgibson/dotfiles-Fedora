@@ -89,6 +89,96 @@ bootstrap_flag() {
 # land in the same report instead of being dropped on the floor.
 note_fail() { blib_note_fail "$@"; }
 
+# ── nvim-treesitter's two version floors ──────────────────────────────────────
+# nvim-treesitter (core/nvim) is pinned to its `main` branch, which hard-requires BOTH a
+# recent tree-sitter CLI and a recent Neovim. Only the first was ever written down here,
+# and only in prose — so the half that was checked was the DEPENDENCY and the half that
+# was not was the thing it is a dependency OF (#192, the same asymmetry as
+# dotfiles-Alpine#170).
+#
+# Each floor is named ONCE here because it is asserted in three places that must agree:
+# the helper below, install/packages.txt's `# min:` on the matching line, and
+# test/check-packages.sh, which fails if this file and the manifest ever disagree. Bump
+# either only when Core's floor actually moves.
+TREESITTER_FLOOR="0.26.1"
+NEOVIM_FLOOR="0.12.0"
+
+# _dotfiles_ver_lt <a> <b> — true when version a sorts BELOW version b.
+# Field-wise integer compare, ported from dotfiles-Alpine's bootstrap.sh so the fleet has
+# one shape for this: no string compare, which would wrongly rank 0.26.10 below 0.26.9,
+# and no `sort -V` dependency. Non-numeric or missing fields read as 0, so a pre-release
+# suffix degrades to "below the floor" rather than to a parse error.
+#
+# This compares what a BINARY reports (`nvim --version`, `tree-sitter --version`) — an
+# upstream semver string, never an RPM EVR — which is why the plain field compare is
+# sufficient here. Its counterpart in test/check-packages.sh reads RPM versions out of the
+# repos, where Fedora's `~`-suffixed pre-releases sort in a way this function does NOT
+# model (`0.12.0~rc1` splits into a non-numeric third field, reads as 0, and so compares
+# EQUAL to `0.12.0` instead of below it). That script therefore tries `rpm.vercmp` first
+# and keeps this shape only as its fallback. Neither form ranks a pre-release of the floor
+# version below the floor, which is deliberate: an rc of the exact target is not the
+# failure this guard hunts, and warning about it would be noise.
+_dotfiles_ver_lt() { # <a> <b>
+  local i x y
+  local -a A B
+  local IFS=.
+  # shellcheck disable=SC2206  # deliberate word-splitting on IFS=. — that IS the parse
+  A=(${1%%-*})
+  # shellcheck disable=SC2206
+  B=(${2%%-*})
+  unset IFS
+  for ((i = 0; i < 4; i++)); do
+    x="${A[i]:-0}"
+    y="${B[i]:-0}"
+    [[ "$x" =~ ^[0-9]+$ ]] || x=0
+    [[ "$y" =~ ^[0-9]+$ ]] || y=0
+    ((10#$x < 10#$y)) && return 0
+    ((10#$x > 10#$y)) && return 1
+  done
+  return 1 # equal — the floor is >=, so equality is NOT below it
+}
+
+# _dotfiles_ts_meets_floor <floor> — true when SOME already-installed tree-sitter clears
+# <floor>. Checks the PATH binary AND ~/.cargo/bin explicitly, because the PATH prelude
+# adds only directories that already exist — on a box whose first cargo build happens in
+# THIS run, ~/.cargo/bin was created after the prelude and is not on this shell's PATH.
+# The same two-part guard the yazi and dust blocks below rely on. A binary whose
+# `--version` cannot be run or parsed counts as NOT meeting the floor.
+_dotfiles_ts_meets_floor() { # <floor>
+  local floor="$1" cand out ver
+  for cand in "$(command -v tree-sitter 2>/dev/null)" "$HOME/.cargo/bin/tree-sitter"; do
+    [[ -n "$cand" && -x "$cand" ]] || continue
+    out="$("$cand" --version 2>/dev/null)" || continue
+    # `tree-sitter --version` prints "tree-sitter 0.26.11"; take the last field.
+    ver="${out##* }"
+    [[ "$ver" =~ ^[0-9] ]] || continue
+    _dotfiles_ver_lt "$ver" "$floor" || return 0
+  done
+  return 1
+}
+
+# _dotfiles_nvim_meets_floor <floor> — true when the nvim that will actually RUN clears
+# <floor>. PATH-only on purpose, unlike its tree-sitter sibling: there is no cargo or
+# user-local neovim to also probe here (no crate ships the binary, and the PATH prelude
+# already puts mise shims and ~/.local/bin ahead of /usr/bin), so whatever
+# `command -v nvim` resolves to IS what Core's config loads. An nvim whose --version
+# cannot be run or parsed counts as NOT meeting the floor — same fail-loud default.
+_dotfiles_nvim_meets_floor() { # <floor>
+  local floor="$1" cand out ver
+  cand="$(command -v nvim 2>/dev/null)" || return 1
+  [[ -n "$cand" && -x "$cand" ]] || return 1
+  out="$("$cand" --version 2>/dev/null)" || return 1
+  # `nvim --version` prints "NVIM v0.12.5" on its first line; take that line's last field
+  # and drop the leading "v". Dev builds print "NVIM v0.12.0-dev-1234+gabc123", which
+  # _dotfiles_ver_lt truncates at the first "-" — 0.12.0-dev reads as 0.12.0.
+  out="${out%%$'\n'*}"
+  ver="${out##* }"
+  ver="${ver#v}"
+  [[ "$ver" =~ ^[0-9] ]] || return 1
+  _dotfiles_ver_lt "$ver" "$floor" && return 1
+  return 0
+}
+
 # ── the OS guard + preflight, as ONE hook: refuse the wrong box before anything runs ──
 # Parse the ID= / ID_LIKE= KEYS rather than grepping the whole file for "fedora": the old
 # `grep -qi fedora /etc/os-release` matched ID_LIKE="fedora" (RHEL, Alma, Rocky, CentOS
@@ -201,6 +291,13 @@ bootstrap_check() {
     command -v "$_t" >/dev/null 2>&1 || blib_say "would install: $_t"
   done
   unset _t
+  # The two floored tools are not in the loop above: presence is not the question for
+  # them, VERSION is. dnf resolves both on every lane and F43 clears neither, so a
+  # `command -v` line here would print nothing on exactly the box that has the problem.
+  _dotfiles_ts_meets_floor "$TREESITTER_FLOOR" ||
+    blib_say "would install: tree-sitter-cli >=$TREESITTER_FLOOR (cargo — the packaged CLI is below the floor, or absent)"
+  _dotfiles_nvim_meets_floor "$NEOVIM_FLOOR" ||
+    blib_say "would warn: neovim is below the >=$NEOVIM_FLOOR floor nvim-treesitter needs (no automatic fix — see the warning at the end of a real run)"
 }
 
 bootstrap_provision() {
@@ -539,6 +636,59 @@ bootstrap_provision() {
   if ! command -v viddy >/dev/null && command -v cargo >/dev/null; then
     ux_spin "viddy (cargo — watch replacement; not in Fedora repos)" \
       cargo install --locked viddy || note_fail "viddy: cargo build failed (log above) — retry later: cargo install --locked viddy"
+  fi
+
+  # ── nvim-treesitter's two version floors (#192) ────────────────────────────
+  # TREESITTER_FLOOR and NEOVIM_FLOOR are declared at the top of this file; the helpers
+  # that read them are beside the declarations. These are the two call sites, and they
+  # sit HERE — after the dnf/rpm-ostree transaction — on purpose: the probe must measure
+  # what will actually run, not what the repo index claims.
+  #
+  # ATOMIC_STAGED, not IS_ATOMIC: on a Silverblue / Kinoite / bootc host the packages above were
+  # LAYERED INTO THE NEXT DEPLOYMENT and are not live in this run, so `nvim --version`
+  # would read the base image and warn about a box that is already fixed, and the
+  # tree-sitter guard would spend minutes building a crate whose ~/.cargo/bin result would
+  # then permanently shadow the layered RPM. Gate on the STAGED COUNT rather than on
+  # IS_ATOMIC so an atomic box that is already fully layered — counter zero, packages live
+  # — still gets probed. (The counter is also bumped by the lazygit COPR layer above, so
+  # an otherwise-current atomic box that layered only lazygit skips these too. That is a
+  # conservative false-skip on a box with a reboot pending anyway; the next run probes.)
+  if ((ATOMIC_STAGED)); then
+    blib_say "nvim/tree-sitter floors: skipped — packages are staged for the next deployment, not live yet (re-run after the reboot)"
+  else
+    # tree-sitter is VERSION-guarded, not presence-guarded, and that is the whole point.
+    # `tree-sitter-cli` IS in install/packages.txt and resolves on every lane, but F43
+    # ships 0.25.10 — BELOW the floor. dnf's binary satisfies `command -v tree-sitter`, so
+    # a presence guard like its neighbours above would skip the build and leave the box
+    # below the floor in silence, with nvim-treesitter quietly broken and nothing said.
+    # The fix works because blib_user_bindirs_on_path PREPENDS ~/.cargo/bin ahead of
+    # /usr/bin, so a cargo-built 0.26.x SHADOWS the older RPM rather than losing to it.
+    if ! _dotfiles_ts_meets_floor "$TREESITTER_FLOOR"; then
+      if command -v cargo >/dev/null; then
+        ux_spin "tree-sitter-cli (cargo — dnf's build is below the >=$TREESITTER_FLOOR floor, or absent)" \
+          cargo install --locked tree-sitter-cli ||
+          note_fail "tree-sitter-cli: cargo build failed (log above) — retry later: cargo install --locked tree-sitter-cli"
+      else
+        # Do NOT let this one go quiet. A box below the floor with nvim-treesitter broken
+        # and nothing said is the exact bug this guard exists to fix.
+        blib_warn "tree-sitter-cli is absent or below nvim-treesitter's >=$TREESITTER_FLOOR floor and cargo is not installed — install it (${BLIB_SU:+$BLIB_SU }dnf install cargo) then: cargo install --locked tree-sitter-cli (or: mise use -g tree-sitter)"
+      fi
+    fi
+    # neovim: the OTHER half of the same requirement, and the half that had no guard at
+    # all until #192 — packages.txt installed a `neovim` that nvim-treesitter will not
+    # load on at all on F43 (0.11.6), while the block above carefully version-checked its
+    # DEPENDENCY.
+    #
+    # WARN-ONLY, deliberately, and the reason is not Alpine's. Alpine cannot offer a
+    # fallback (upstream's releases are glibc-linked AppImages that will not run on musl);
+    # glibc Fedora could. It is declined anyway: swapping the system editor mid-bootstrap
+    # is a far larger intervention than adding a missing CLI, a mise shim silently changes
+    # what `nvim` means on the box, and F43 — the only affected lane — goes EOL about four
+    # weeks after F45's GA. Name the two real fixes and let the operator choose. blib_warn
+    # and NOT note_fail: this must not fail the run, even under --strict.
+    if ! _dotfiles_nvim_meets_floor "$NEOVIM_FLOOR"; then
+      blib_warn "neovim is absent or below nvim-treesitter's >=$NEOVIM_FLOOR floor (F43 ships 0.11.6; F44/F45/rawhide ship 0.12.5) — nvim-treesitter will not load. Fix: move this box to F44+, or install a newer nvim (mise use -g neovim@0.12)"
+    fi
   fi
   # tealdeer + procs are still in install/packages.txt and still install cleanly on
   # F43/F44, but both went orphan and neither was rebuilt for rawhide/F45 — the same
