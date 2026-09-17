@@ -33,6 +33,14 @@
 #   DIVERGENT — declared in both, different by design:
 #     PKG_REFRESH PKG_UPGRADE PKG_INSTALL PKG_REMOVE PKG_OWNS — dnf on one, rpm-ostree
 #     (rpm for OWNS) on the other
+#   DIVERGENT_NONVERB — declared in both, different by design, and NOT a command:
+#     PKG_UNLISTED_TOOLS — the binaries each edition's verbs run that packages.txt does
+#     not name. It differs because the VERBS differ: the dnf edition runs one binary,
+#     the atomic edition four. Kept out of DIVERGENT because that list's check asserts
+#     `dnf` on one side and never on the other, and this key's atomic value legitimately
+#     CONTAINS dnf. Core's own validator already holds each file's value to its own
+#     verbs from both ends (an unrun name FAILS, and so does a name packages.txt
+#     installs), so this test only has to stop demanding the two be identical.
 #   everything else — identical, key for key and value for value. That includes
 #     MAINT_UNATTENDED_UPGRADE: a staged upgrade is inert until the operator reboots, so
 #     unattended staging is SAFER than a mutable upgrade, and the atomic file keeps it.
@@ -77,6 +85,8 @@ ATOMIC=os/fedora.atomic.capabilities
 ATOMIC_ONLY="PROVISIONER PKG_APPLY PKG_APPLY_PENDING PKG_APPLY_PENDING_EXIT"
 DNF_ONLY="PKG_COUNT_PENDING PKG_ASSUME_YES PKG_UPGRADE_PARTIAL PKG_PENDING_MATCH"
 DIVERGENT="PKG_REFRESH PKG_UPGRADE PKG_INSTALL PKG_REMOVE PKG_OWNS"
+# Declared in both and different by design, but NOT a command — see the contract above.
+DIVERGENT_NONVERB="PKG_UNLISTED_TOOLS"
 
 fails=()
 note_fail() { fails+=("$1"); }
@@ -221,8 +231,19 @@ for k in $DNF_ONLY; do
     note_fail "$ATOMIC declares $k=$v — no count verb (the AVAILABLE question is root-only on an atomic host), nothing prompts, and the image upgrades as a whole; the key belongs to the dnf file only"
   fi
 done
+for k in $DIVERGENT_NONVERB; do
+  a="$(cap_get "$DNF_DUMP" "$k")" || a=""
+  b="$(cap_get "$ATOMIC_DUMP" "$k")" || b=""
+  # BOTH must declare it. Exempting a key from the identical-values sweep must not also
+  # exempt it from existing: a file that simply dropped it would then pass silently, and
+  # the warnings it suppresses would come back on that edition alone.
+  [[ -n "$a" ]] || note_fail "$DNF declares no $k — it is a declared divergence, not an optional key here"
+  [[ -n "$b" ]] || note_fail "$ATOMIC declares no $k — it is a declared divergence, not an optional key here"
+  [[ -z "$a" || -z "$b" ]] || printf '  %-24s dnf %s | atomic %s\n' "$k" "'$a'" "'$b'"
+done
 printf '  %s\n' "atomic-only: $ATOMIC_ONLY"
 printf '  %s\n' "dnf-only:    $DNF_ONLY"
+printf '  %s\n' "divergent (non-verb): $DIVERGENT_NONVERB"
 
 # ── 4. every OTHER key is identical, key for key and value for value ──────────
 # The load-bearing check. The two files are kept in step BY HAND, so this is the one
@@ -232,7 +253,7 @@ say "the remaining keys — identical in both declarations"
 diverged=0
 while IFS= read -r k; do
   [[ -n "$k" ]] || continue
-  in_list "$k" "$DIVERGENT $ATOMIC_ONLY $DNF_ONLY" && continue
+  in_list "$k" "$DIVERGENT $DIVERGENT_NONVERB $ATOMIC_ONLY $DNF_ONLY" && continue
   a="$(cap_get "$DNF_DUMP" "$k")" || a=""
   if ! b="$(cap_get "$ATOMIC_DUMP" "$k")"; then
     note_fail "$k is declared in $DNF but not in $ATOMIC — every key outside the declared sets must exist in both"
@@ -247,7 +268,7 @@ done < <(cap_keys "$DNF_DUMP")
 
 while IFS= read -r k; do
   [[ -n "$k" ]] || continue
-  in_list "$k" "$DIVERGENT $ATOMIC_ONLY $DNF_ONLY" && continue
+  in_list "$k" "$DIVERGENT $DIVERGENT_NONVERB $ATOMIC_ONLY $DNF_ONLY" && continue
   cap_get "$DNF_DUMP" "$k" >/dev/null || {
     note_fail "$k is declared in $ATOMIC but not in $DNF — every key outside the declared sets must exist in both"
     diverged=1
@@ -332,7 +353,7 @@ if ((${#fails[@]})); then
 
 Both declarations document their own delta at length. If a divergence here is
 INTENDED, say so in both files and add the key to the matching list in this test
-(ATOMIC_ONLY / DNF_ONLY / DIVERGENT); if it is not, the fix is to bring the two files
+(ATOMIC_ONLY / DNF_ONLY / DIVERGENT / DIVERGENT_NONVERB); if it is not, the fix is to bring the two files
 back into step by hand.
 EOF
   exit 2
