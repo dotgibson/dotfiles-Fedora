@@ -8,7 +8,7 @@ vendors only what a machine actually runs.
 
 ## What this repo is
 
-`dotfiles-Fedora` is the **OS-native layer for Fedora** in an **eleven-repo dotfiles system** built on a three-layer
+`dotfiles-Fedora` is the **OS-native layer for Fedora** in a **twelve-repo dotfiles system** built on a three-layer
 model (Core → OS-native → Role). Fedora is the **template** the other Linux repos are stamped from: OS-native structure changes start here, then propagate per `core/PORTING-MATRIX.md`. `dnf` + RPM Fusion.
 
 ## The rule that bites
