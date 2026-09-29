@@ -215,12 +215,14 @@ say "checking ${#pkgs[@]} package names on Fedora ${release:-unknown}"
 echo "::notice::checking ${#pkgs[@]} package names on Fedora ${release:-unknown}"
 
 missing=()
+virtual=()
 for p in "${pkgs[@]}"; do
   if [ -n "$(dnf repoquery --qf '%{name}' "$p" 2>/dev/null)" ]; then
     continue
   fi
   if [ -n "$(dnf repoquery --whatprovides "$p" --qf '%{name}' 2>/dev/null)" ]; then
     echo "  $p -> provided virtually"
+    virtual+=("$p")
     continue
   fi
   missing+=("$p")
@@ -251,12 +253,17 @@ done
 # wget1-wget 1.25.0 and wget2-wget 2.2.1 — two providers on two unrelated version scales,
 # with nothing saying which dnf would pick. A floor there is unanswerable; say so, and put
 # the floor on the providing package's real name instead.
+#
+# NO `--` BEFORE THE NAME. dnf5 only learned `--` as end-of-options in 5.4; the 5.2.x that
+# fedora:43 ships takes it as an unknown argument, errors (into 2>/dev/null) and prints
+# nothing — so every floored name read as "virtual" on F43 alone, from #193 until this was
+# found. Manifest names never begin with `-`, so the separator bought nothing to lose.
 _pkg_candidate() { # <name> → the newest version dnf would install, or nothing
   local v best=""
   while read -r v; do
     [[ -n "$v" ]] || continue
     if [[ -z "$best" ]] || _ver_lt "$best" "$v"; then best="$v"; fi
-  done < <(dnf -q repoquery --available --latest-limit 1 --qf '%{version}\n' -- "$1" 2>/dev/null)
+  done < <(dnf -q repoquery --available --latest-limit 1 --qf '%{version}\n' "$1" 2>/dev/null)
   [[ -n "$best" ]] || return 1
   printf '%s' "$best"
 }
@@ -271,7 +278,13 @@ for p in "${!PKG_MIN[@]}"; do
     # absence twice. What is left is a name that resolves ONLY virtually, which is a
     # manifest-authoring bug rather than release drift: it is wrong on every release.
     if ((${#missing[@]})) && [[ " ${missing[*]} " == *" $p "* ]]; then continue; fi
-    floor_fail+=("$p — declares min:$floor but has no %{version} of its own (it resolves only as a virtual capability); a floor cannot be judged there — move it onto the providing package's name")
+    if ((${#virtual[@]})) && [[ " ${virtual[*]} " == *" $p "* ]]; then
+      floor_fail+=("$p — declares min:$floor but has no %{version} of its own (it resolves only as a virtual capability); a floor cannot be judged there — move it onto the providing package's name")
+    else
+      # Resolved by NAME above, yet the version probe returned nothing: that is the probe
+      # failing on this release's dnf, not the manifest — say so rather than blame the entry.
+      floor_fail+=("$p — resolves by name, but the version probe (dnf repoquery --available --latest-limit 1) returned nothing on this release's dnf — a probe bug, not a manifest one")
+    fi
     continue
   fi
   if _ver_lt "$cand" "$floor"; then
