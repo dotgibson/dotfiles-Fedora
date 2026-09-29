@@ -38,10 +38,15 @@ on:
     # on a plain ubuntu runner. A change that can move a floor VERDICT (rather than just
     # delete a floor) has to edit install/packages.txt too — the assertion forces the two
     # to match — and install/packages.txt IS in this filter.
-    paths: ['install/packages.txt', '.github/workflows/packages.yml']
+    #
+    # test/check-packages.sh IS in it, though, because it is the probe this workflow runs:
+    # the plain-runner suite exits at its `dnf` guard, so a change to the dnf half is only
+    # ever exercised here. Without it the F43 `--` probe fix could not reach the F43 leg it
+    # fixed, which is how a probe that erred on one dnf5 stayed red there unnoticed.
+    paths: ['install/packages.txt', 'test/check-packages.sh', '.github/workflows/packages.yml']
   push:
     branches: [main]
-    paths: ['install/packages.txt', '.github/workflows/packages.yml']
+    paths: ['install/packages.txt', 'test/check-packages.sh', '.github/workflows/packages.yml']
   schedule:
     # Sat 07:00 UTC — an hour ahead of the web showcase (08:00) and the OS-repo Claude
     # routine (09:00), so the fleet never draws on the same slot.

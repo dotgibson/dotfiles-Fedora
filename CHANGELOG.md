@@ -21,6 +21,8 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
   check reported neovim and tree-sitter-cli as "virtual capabilities" on F43 only. The `--`
   is gone; manifest names never start with `-`. A floored name that resolves by name but
   yields no version now reports a probe failure instead of blaming the manifest entry.
+  `packages.yml`'s path filter now includes `test/check-packages.sh`, because a change to
+  the probe is only exercised on that workflow's Fedora containers.
 
 - **The tmux auto-attach honours `DOTFILES_NO_AUTOTMUX`, the fleet's one opt-out name**
   (dotgibson/dotfiles-core#877). MacBook, openSUSE and Gentoo already read it; this layer
