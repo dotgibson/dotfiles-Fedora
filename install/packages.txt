@@ -40,6 +40,7 @@ procs          # ps — ORPHANED, last built F44; no F45/rawhide(F46) build. Sam
                # covers F45+.
 yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (kislyuk's Python yq is not packaged for Fedora at all)
 glow           # markdown viewer
+jc             # command output -> JSON (kellyjonbrazil/jc); F43-F46 ship 1.26.0, pulls python3-jc
 gum            # shell-script UI toolkit (charm)
 du-dust        # dust (du) — Fedora's package name; installs the `dust` binary, same as Debian's
 # xh, sd, doggo, carapace, sesh, gron, op (1Password CLI): NOT reliably in
