@@ -134,6 +134,14 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Added
 
+- **`jc` is installed from dnf** (dotgibson/dotfiles-core#1208). `jc` converts the output of
+  common commands (`ps`, `df`, `dig`, `ip`, ...) to JSON for `jq`/`yq`. Fedora packages it on
+  every supported release — `jc` 1.26.0 on F43, F44, F45 and rawhide (F46), shipping
+  `/usr/bin/jc` and pulling `python3-jc` — so it is one line in `install/packages.txt`, and
+  the atomic edition layers it from the same list with no change. This is the OS half of a
+  fleet ratchet: Core's `core-doctor` probe and `PORTING-MATRIX.md` row land after the OS
+  repos install it.
+
 - **`make lint` stops warning about `dnf` on every package verb**
   (dotgibson/dotfiles-core#1087, dotgibson/dotfiles-core#1104). Core's capability
   cross-check warns when a `PKG_*` verb's leading binary is absent from
