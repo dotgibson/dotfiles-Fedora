@@ -334,6 +334,16 @@ bootstrap_provision() {
   # cargo builds may have created ~/.cargo/bin. Idempotent by construction.
   blib_user_bindirs_on_path
 
+  # ── cargo builds go to DISK, not /tmp ───────────────────────────────────────
+  # `cargo install` builds in $TMPDIR (default /tmp), and yazi-build nests a second build
+  # there too. Fedora's /tmp is a tmpfs with a per-user quota; on a 4 GB box that quota is
+  # ~1.5 GB, and yazi alone fills ~900 MB of it. Every later cargo block then dies with
+  # EDQUOT, each failure reported only as a note_fail, so the box ends with no
+  # ~/.cargo/bin at all. Exported for the rest of provisioning so every cargo block below
+  # (and anything it spawns) inherits it. cargo removes its own temp dir on success.
+  export TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-bootstrap/tmp"
+  mkdir -p "$TMPDIR" 2>/dev/null || unset TMPDIR
+
   trap 'blib_sudo_keepalive_stop' EXIT
   blib_sudo_keepalive_start || {
     echo "sudo authentication failed — cannot provision packages." >&2
@@ -644,7 +654,7 @@ bootstrap_provision() {
   # the binary: jj ships as `jj-cli` (the `jujutsu` crate is a redirect stub, see
   # PORTING-MATRIX.md footnote 8) and watchexec as `watchexec-cli`.
   local _bin _crate
-  for _bin in ast-grep:ast-grep jj:jj-cli ouch:ouch jnv:jnv gping:gping watchexec:watchexec-cli; do
+  for _bin in ast-grep:ast-grep jj:jj-cli jnv:jnv gping:gping watchexec:watchexec-cli; do
     _crate="${_bin#*:}" _bin="${_bin%%:*}"
     if ! command -v "$_bin" >/dev/null && command -v cargo >/dev/null; then
       ux_spin "$_bin (cargo — not in Fedora repos)" \
@@ -652,6 +662,18 @@ bootstrap_provision() {
     fi
   done
   unset _bin _crate
+  # ouch is NOT in the loop above: a default `cargo install ouch` cannot build here at all.
+  # Its default `unrar` feature pulls unrar-ng-sys, whose build.rs unconditionally passes
+  # `-stdlib=libc++`, and this box has GCC + libstdc++ (PORTING-MATRIX.md, the GURU ouch
+  # note). `bzip3` is dropped too: libbzip3-sys runs bindgen, which needs libclang, and
+  # nothing here installs clang. Verified on F44: ouch 0.8.3 builds with exactly this set.
+  # The cost is RAR and .bz3 support; every other format ouch handles is kept.
+  local _ouch_feat="use_zlib,use_zstd_thin"
+  if ! command -v ouch >/dev/null && command -v cargo >/dev/null; then
+    ux_spin "ouch (cargo, without RAR/bz3 — not in Fedora repos)" \
+      cargo install --locked ouch --no-default-features --features "$_ouch_feat" ||
+      note_fail "ouch: cargo build failed (log above) — retry later: cargo install --locked ouch --no-default-features --features $_ouch_feat"
+  fi
 
   # ── nvim-treesitter's two version floors (#192) ────────────────────────────
   # TREESITTER_FLOOR and NEOVIM_FLOOR are declared at the top of this file; the helpers
