@@ -647,10 +647,15 @@ bootstrap_provision() {
       GOBIN="$gobin" ux_spin "$2 (go install)" go install "$1" ||
         note_fail "$2: go install failed — retry later: GOBIN=$gobin go install $1"
     elif command -v mise >/dev/null 2>&1; then
-      # `mise exec go@latest` may first DOWNLOAD an entire Go toolchain, so this is the
-      # slowest arm of the three and the one that most needs a visible elapsed time.
-      GOBIN="$gobin" ux_spin "$2 (go install via mise)" mise exec go@latest -- go install "$1" ||
-        note_fail "$2: go install failed — retry later: GOBIN=$gobin go install $1"
+      # The toolchain is installed EXPLICITLY first; `mise exec go@latest` does not fetch it.
+      # Core's mise/config.toml sets `auto_install = false` (explicit installs only), and
+      # current mise (verified 2026.10.7) inherits that into `exec_auto_install` too, so a
+      # bare `mise exec` on a box with no Go fails in ~2s with "go couldn't exec process".
+      # `mise install` is a no-op once Go is present, so only the first of the three
+      # callers pays for the download.
+      ux_spin "go toolchain (mise install go@latest)" mise install go@latest &&
+        GOBIN="$gobin" ux_spin "$2 (go install via mise)" mise exec go@latest -- go install "$1" ||
+        note_fail "$2: go install failed — retry later: mise install go@latest && GOBIN=$gobin mise exec go@latest -- go install $1"
     else
       note_fail "$2: needs Go — install later with: GOBIN=$gobin go install $1"
     fi
