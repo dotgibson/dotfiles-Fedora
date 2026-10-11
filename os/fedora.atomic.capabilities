@@ -51,3 +51,9 @@ SCHEDULER_UNIT_DIR=~/.config/systemd/user
 
 # ── how `up` applies (optional) ───────────────────────────────────────────────
 MAINT_UNATTENDED_UPGRADE=1
+
+# ── optional tools ────────────────────────────────────────────────────────────
+# Same declaration as os/fedora.capabilities, for the same reason: bootstrap.sh installs
+# every probed tool on this edition too (rpm-ostree layers packages.txt; the cargo/go
+# blocks are user-local). See that file for why it is `none` and not an empty value.
+TOOLS_OPTIN=none
