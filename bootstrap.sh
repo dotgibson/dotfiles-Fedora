@@ -471,7 +471,14 @@ bootstrap_provision() {
   fi
   if ! command -v atuin >/dev/null; then
     blib_say "atuin (official installer)"
-    run_installer atuin https://setup.atuin.sh
+    # --non-interactive is REQUIRED, not a preference. Without it setup.atuin.sh probes for
+    # a terminal with `{ exec 3</dev/tty; } 2>/dev/null` under `set -eu`, and in POSIX sh a
+    # failed redirection on the special builtin `exec` EXITS the shell, even inside an
+    # `if`. So with no controlling tty (CI, a detached or agent-driven run) the installer
+    # dies with status 1 on its fourth line, having printed nothing. With a tty it instead
+    # asks its import/register/setup prompts, which run_installer's >/dev/null would hide,
+    # leaving an invisible prompt waiting on /dev/tty. Neither belongs in bootstrap.
+    run_installer atuin https://setup.atuin.sh --non-interactive
   fi
   # atuin's installer hard-codes ~/.atuin/bin (install.sh: ATUIN_BIN="$HOME/.atuin/bin/atuin")
   # and appends its own init line to ~/.zshrc — but wire_links() below REPLACES that file with
