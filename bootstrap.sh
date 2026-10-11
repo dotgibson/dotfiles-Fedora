@@ -342,11 +342,15 @@ bootstrap_provision() {
   # ~/.cargo/bin at all. Exported for the rest of provisioning so every cargo block below
   # (and anything it spawns) inherits it. cargo removes its own temp dir on success;
   # cargo_install below sweeps what a FAILED build leaves, and bootstrap_closing removes
-  # the whole dir and puts the caller's TMPDIR back (#208).
+  # the whole dir and puts the caller's TMPDIR back (#208). The dir is unique PER RUN
+  # (mktemp -d), never a fixed path: both of those deletes would otherwise reach into a
+  # second bootstrap running at the same time and pull its builds out from under it.
   _BOOT_TMPDIR_ORIG="${TMPDIR-}"
   _BOOT_TMPDIR_WAS_SET="${TMPDIR+1}"
-  _BOOT_TMP="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-bootstrap/tmp"
-  if mkdir -p "$_BOOT_TMP" 2>/dev/null; then
+  _BOOT_TMP=""
+  local _boot_tmp_base="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-bootstrap"
+  if mkdir -p "$_boot_tmp_base" 2>/dev/null &&
+    _BOOT_TMP="$(mktemp -d "$_boot_tmp_base/run.XXXXXX" 2>/dev/null)"; then
     export TMPDIR="$_BOOT_TMP"
   else
     _BOOT_TMP=""
@@ -920,7 +924,9 @@ bootstrap_provision() {
     # than silently trusting the replacement — which is the entire point.
     local _op_fpr_want="3FEF9748469ADBE15DA7CA80AC2D62742012EA22"
     local _op_key="" _op_fpr_got="" _op_rc=0
-    _op_key="$(mktemp)" || _op_key=""
+    # A failed mktemp is a local write failure too (a full disk or quota) — rc 23 makes
+    # _dl_why say so, instead of blaming the network for a fetch that never ran.
+    _op_key="$(mktemp)" || { _op_key=""; _op_rc=23; }
     if [[ -n "$_op_key" ]]; then
       curl -fsSL --max-time 30 \
         https://downloads.1password.com/linux/keys/1password.asc -o "$_op_key" 2>/dev/null || _op_rc=$?
@@ -1043,8 +1049,8 @@ bootstrap_wire_pre_loader() {
 # shellcheck disable=SC2329
 bootstrap_closing() {
   # Drop the on-disk build scratch (see "cargo builds go to DISK") and hand the caller's
-  # TMPDIR back. The suffix guard keeps this rm from ever aiming at anything else.
-  if [[ "${_BOOT_TMP:-}" == */dotfiles-bootstrap/tmp ]]; then
+  # TMPDIR back. The path guard keeps this rm from ever aiming at anything else.
+  if [[ "${_BOOT_TMP:-}" == */dotfiles-bootstrap/run.* ]]; then
     rm -rf -- "$_BOOT_TMP"
     if [[ -n "${_BOOT_TMPDIR_WAS_SET:-}" ]]; then
       export TMPDIR="$_BOOT_TMPDIR_ORIG"
