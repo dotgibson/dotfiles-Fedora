@@ -138,7 +138,7 @@ changes nothing:
 | ------------------- | ------------------------------------------------------------------ |
 | `--dry-run`         | Print the full plan (packages *and* symlinks); mutate nothing      |
 | `--links-only`      | Re-link only — no `dnf`, no downloads                              |
-| `--no-flatpak`      | Skip Flathub (recommended on WSL)                                  |
+| `--no-flatpak`      | Skip Flathub (WSL, headless/server boxes)                          |
 | `--only` / `--skip` | Restrict wiring to module groups: `zsh nvim tmux git prompt tools` |
 | `--strict`          | Exit non-zero if any best-effort step failed                       |
 | `--force-os`        | Allow a Fedora-*like* distro (RHEL/Alma/Rocky/Nobara)              |

@@ -58,7 +58,7 @@ bootstrap_usage() {
 bootstrap.sh — provision a Fedora box (Workstation, Server, or WSL) and wire up dotfiles.
 Idempotent: safe to re-run.
 
-  ./bootstrap.sh --no-flatpak     skip Flathub/GUI apps (recommended on WSL)
+  ./bootstrap.sh --no-flatpak     skip Flathub/GUI apps (WSL, headless/server boxes)
   ./bootstrap.sh --force-os       run on a Fedora-LIKE distro (RHEL/Alma/Rocky/Nobara)
 
 Env:
@@ -1027,8 +1027,14 @@ REPO
 
   if ((DO_FLATPAK)) && ! ((IS_WSL)); then
     blib_say "Flathub"
-    flatpak remote-add --if-not-exists flathub \
-      https://flathub.org/repo/flathub.flatpakrepo >/dev/null 2>&1 || true
+    # Under priv, like dnf above (dotfiles-Arch#199). Without --user this is a SYSTEM
+    # remote, which flatpak authorizes through polkit — and a headless/SSH box has no
+    # polkit agent to prompt, so as the plain user it fails with "EnsureRepo not allowed
+    # for user". The old `2>&1 || true` hid that completely: the box simply had no
+    # Flathub. Running it as root sidesteps polkit; a miss is now recorded, not swallowed.
+    priv flatpak remote-add --if-not-exists flathub \
+      https://flathub.org/repo/flathub.flatpakrepo >/dev/null ||
+      note_fail "Flathub remote — could not be added; retry: ${BLIB_SU:+$BLIB_SU }flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
   fi
 }
 
