@@ -478,7 +478,38 @@ bootstrap_provision() {
     # dies with status 1 on its fourth line, having printed nothing. With a tty it instead
     # asks its import/register/setup prompts, which run_installer's >/dev/null would hide,
     # leaving an invisible prompt waiting on /dev/tty. Neither belongs in bootstrap.
-    run_installer atuin https://setup.atuin.sh --non-interactive
+    #
+    # The installer also edits shell rc files, and none of it is wanted here: Core runs
+    # `atuin init zsh` itself (00-tools.zsh), and the ~/.local/bin link below puts atuin on
+    # PATH. So: ATUIN_NO_MODIFY_PATH=1 stops the inner release installer's `. ~/.atuin/bin/env`
+    # lines (.profile, .bashrc, .bash_profile, .bash_login, .zshrc, .zshenv), and the outer
+    # script's unconditional `eval "$(atuin init zsh|bash)"` appends are undone by putting
+    # ~/.zshrc and ~/.bashrc back exactly as they were. Restore, not a sed: a line the user
+    # wrote themselves before this run must survive. A file the installer CREATED is removed
+    # only if nothing but its init line is in it.
+    local -a _atuin_rcs=("${ZDOTDIR:-$HOME}/.zshrc" "$HOME/.bashrc")
+    local _atuin_bak _i
+    _atuin_bak="$(mktemp -d)" || _atuin_bak=""
+    if [[ -n "$_atuin_bak" ]]; then
+      for _i in "${!_atuin_rcs[@]}"; do
+        [[ -f "${_atuin_rcs[_i]}" ]] && cp -p -- "${_atuin_rcs[_i]}" "$_atuin_bak/$_i"
+      done
+    fi
+    ATUIN_NO_MODIFY_PATH=1 run_installer atuin https://setup.atuin.sh --non-interactive
+    if [[ -n "$_atuin_bak" ]]; then
+      for _i in "${!_atuin_rcs[@]}"; do
+        if [[ -f "$_atuin_bak/$_i" ]]; then
+          # `cat >` rather than cp/mv: keeps the file's inode, and writes THROUGH a symlink.
+          cmp -s -- "$_atuin_bak/$_i" "${_atuin_rcs[_i]}" ||
+            cat -- "$_atuin_bak/$_i" >"${_atuin_rcs[_i]}" ||
+            note_fail "atuin: could not undo the installer's edit to ${_atuin_rcs[_i]} — remove its 'atuin init' line by hand"
+        elif [[ -f "${_atuin_rcs[_i]}" ]] &&
+          ! grep -qvE '^[[:space:]]*$|^eval "\$\(atuin init (zsh|bash)\)"$' -- "${_atuin_rcs[_i]}"; then
+          rm -f -- "${_atuin_rcs[_i]}"
+        fi
+      done
+      rm -rf -- "$_atuin_bak"
+    fi
   fi
   # atuin's installer hard-codes ~/.atuin/bin (install.sh: ATUIN_BIN="$HOME/.atuin/bin/atuin")
   # and appends its own init line to ~/.zshrc — but wire_links() below REPLACES that file with
