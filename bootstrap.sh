@@ -369,7 +369,7 @@ bootstrap_provision() {
     return "$rc"
   }
 
-  trap 'blib_sudo_keepalive_stop' EXIT
+  trap 'blib_sudo_keepalive_stop; _boot_tmp_cleanup' EXIT
   blib_sudo_keepalive_start || {
     echo "sudo authentication failed — cannot provision packages." >&2
     exit 1
@@ -1046,10 +1046,11 @@ bootstrap_wire_pre_loader() {
 # What only this repo knows at the end: on an atomic host the packages are layered, not
 # live, and the cargo/go tools that need the layered toolchain were skipped by their
 # presence guards. The driver prints the tally; this says what to do next.
-# shellcheck disable=SC2329
-bootstrap_closing() {
-  # Drop the on-disk build scratch (see "cargo builds go to DISK") and hand the caller's
-  # TMPDIR back. The path guard keeps this rm from ever aiming at anything else.
+# _boot_tmp_cleanup — drop the on-disk build scratch (see "cargo builds go to DISK") and
+# hand the caller's TMPDIR back. Called from bootstrap_closing AND from provisioning's EXIT
+# trap, so an aborted run (a hard exit, or set -e) does not strand a multi-GB run dir that
+# no later run would ever remove. The path guard keeps this rm from aiming anywhere else.
+_boot_tmp_cleanup() {
   if [[ "${_BOOT_TMP:-}" == */dotfiles-bootstrap/run.* ]]; then
     rm -rf -- "$_BOOT_TMP"
     if [[ -n "${_BOOT_TMPDIR_WAS_SET:-}" ]]; then
@@ -1057,7 +1058,14 @@ bootstrap_closing() {
     else
       unset TMPDIR
     fi
+    _BOOT_TMP="" # once only: the EXIT trap calls this again after bootstrap_closing
   fi
+  return 0
+}
+
+# shellcheck disable=SC2329
+bootstrap_closing() {
+  _boot_tmp_cleanup
   if ((ATOMIC_STAGED)); then
     blib_warn "$ATOMIC_STAGED package(s) layered into the next deployment — reboot to apply (${BLIB_SU:+$BLIB_SU }systemctl reboot), then re-run ./bootstrap.sh once so the cargo/go tools build against the layered toolchain"
   fi
