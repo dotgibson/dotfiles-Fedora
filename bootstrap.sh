@@ -633,7 +633,9 @@ bootstrap_provision() {
   fi
   # mise — polyglot runtime manager (node/python/go/...). Portable; activated in
   # core/zsh/00-tools.zsh. Install the binary here; runtimes are fetched separately
-  # with `mise install` (kept out of bootstrap so it stays fast/predictable).
+  # with `mise install` (kept out of bootstrap so it stays fast/predictable), with ONE
+  # exception: when no system Go exists, _dotfiles_go_install runs `mise install go@latest`
+  # so doggo/sesh/gron have a toolchain to build with. Nothing else installs a runtime here.
   if ! command -v mise >/dev/null && [[ ! -x "$HOME/.local/bin/mise" ]]; then
     blib_say "mise (official installer)"
     run_installer mise https://mise.run
