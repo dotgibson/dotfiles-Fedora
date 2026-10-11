@@ -340,11 +340,36 @@ bootstrap_provision() {
   # ~1.5 GB, and yazi alone fills ~900 MB of it. Every later cargo block then dies with
   # EDQUOT, each failure reported only as a note_fail, so the box ends with no
   # ~/.cargo/bin at all. Exported for the rest of provisioning so every cargo block below
-  # (and anything it spawns) inherits it. cargo removes its own temp dir on success.
-  export TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-bootstrap/tmp"
-  mkdir -p "$TMPDIR" 2>/dev/null || unset TMPDIR
+  # (and anything it spawns) inherits it. cargo removes its own temp dir on success;
+  # cargo_install below sweeps what a FAILED build leaves, and bootstrap_closing removes
+  # the whole dir and puts the caller's TMPDIR back (#208). The dir is unique PER RUN
+  # (mktemp -d), never a fixed path: both of those deletes would otherwise reach into a
+  # second bootstrap running at the same time and pull its builds out from under it.
+  _BOOT_TMPDIR_ORIG="${TMPDIR-}"
+  _BOOT_TMPDIR_WAS_SET="${TMPDIR+1}"
+  _BOOT_TMP=""
+  local _boot_tmp_base="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-bootstrap"
+  if mkdir -p "$_boot_tmp_base" 2>/dev/null &&
+    _BOOT_TMP="$(mktemp -d "$_boot_tmp_base/run.XXXXXX" 2>/dev/null)"; then
+    export TMPDIR="$_BOOT_TMP"
+  else
+    _BOOT_TMP=""
+  fi
 
-  trap 'blib_sudo_keepalive_stop' EXIT
+  # cargo_install <args…> — `cargo install`, then sweep its build dirs even on FAILURE:
+  # cargo keeps cargo-install* when a build dies, and yazi-build keeps its nested
+  # yazi-build-*, so one failed crate used to strand GBs for the rest of the run. Targeted
+  # globs, not the whole dir: ux_spin's own capture file lives in it while this runs.
+  cargo_install() {
+    local rc=0
+    cargo install "$@" || rc=$?
+    if [[ -n "${_BOOT_TMP:-}" ]]; then
+      rm -rf -- "$_BOOT_TMP"/cargo-install* "$_BOOT_TMP"/yazi-build-*
+    fi
+    return "$rc"
+  }
+
+  trap 'blib_sudo_keepalive_stop; _boot_tmp_cleanup' EXIT
   blib_sudo_keepalive_start || {
     echo "sudo authentication failed — cannot provision packages." >&2
     exit 1
@@ -437,6 +462,17 @@ bootstrap_provision() {
   #     needs root at all. starship defaults to /usr/local/bin and escalates on its own;
   #     -b puts it alongside everything else and drops that escalation entirely.
   #
+  # _dl_why <curl-rc> — the parenthetical for a failed download. curl's 23 is "failure
+  # writing output": the network was fine and the DISK under $TMPDIR was not — a full
+  # tmpfs or its per-user quota (#208). Blaming that on the network sent readers astray.
+  _dl_why() {
+    if (($1 == 23)); then
+      printf 'could not write to %s — disk full or quota?' "${TMPDIR:-/tmp}"
+    else
+      printf 'offline?'
+    fi
+  }
+
   # run_installer <label> <url> [args...] — fetch to a temp file, sanity-check it, run it.
   run_installer() {
     local label="$1" url="$2"
@@ -446,9 +482,10 @@ bootstrap_provision() {
       note_fail "$label: could not create a temp file — skipped"
       return 0
     }
-    if ! curl -fsSL --max-time 60 "$url" -o "$tmp"; then
+    curl -fsSL --max-time 60 "$url" -o "$tmp" || rc=$?
+    if ((rc != 0)); then
       rm -f "$tmp"
-      note_fail "$label: download failed (offline?) — retry later: curl -fsSL $url -o /tmp/$label.sh && sh /tmp/$label.sh"
+      note_fail "$label: download failed ($(_dl_why "$rc")) — retry later: curl -fsSL $url -o /tmp/$label.sh && sh /tmp/$label.sh"
       return 0
     fi
     # A proxy/captive portal that answers with an HTML error page is still a 200; refuse to
@@ -592,7 +629,7 @@ bootstrap_provision() {
   # call below.
   if ! command -v yazi >/dev/null && command -v cargo >/dev/null; then
     ux_spin "yazi (cargo — builds from source)" \
-      cargo install --force --locked yazi-build || note_fail "yazi: cargo build failed (log above) — retry later: cargo install --force --locked yazi-build"
+      cargo_install --force --locked yazi-build || note_fail "yazi: cargo build failed (log above) — retry later: cargo install --force --locked yazi-build"
   fi
   # mise — polyglot runtime manager (node/python/go/...). Portable; activated in
   # core/zsh/00-tools.zsh. Install the binary here; runtimes are fetched separately
@@ -673,24 +710,24 @@ bootstrap_provision() {
   # repos the name is dropped SILENTLY and cargo picks it up here instead.
   if ! command -v dust >/dev/null && command -v cargo >/dev/null; then
     ux_spin "dust (cargo fallback — RPM du-dust preferred; crate du-dust)" \
-      cargo install --locked du-dust || note_fail "dust: cargo build failed (log above) — retry later: cargo install --locked du-dust"
+      cargo_install --locked du-dust || note_fail "dust: cargo build failed (log above) — retry later: cargo install --locked du-dust"
   fi
   if ! command -v xh >/dev/null && command -v cargo >/dev/null; then
     ux_spin "xh (cargo; not in Fedora repos)" \
-      cargo install --locked xh || note_fail "xh: cargo build failed (log above) — retry later: cargo install --locked xh"
+      cargo_install --locked xh || note_fail "xh: cargo build failed (log above) — retry later: cargo install --locked xh"
   fi
   # sd (sed replacement) was retired from Fedora after F41 — rust-sd's `sd` subpackage
   # last built 1.0.0-4.fc41, so `dnf install sd` fails on current releases. Same story
   # as gron below, just Rust instead of Go.
   if ! command -v sd >/dev/null && command -v cargo >/dev/null; then
     ux_spin "sd (cargo — retired from Fedora repos after F41)" \
-      cargo install --locked sd || note_fail "sd: cargo build failed (log above) — retry later: cargo install --locked sd"
+      cargo_install --locked sd || note_fail "sd: cargo build failed (log above) — retry later: cargo install --locked sd"
   fi
   # viddy (watch replacement; Core aliases watch->viddy, HAVE_VIDDY-guarded) is a Rust
   # CLI, not in Fedora repos — build from source via cargo like xh/sd above.
   if ! command -v viddy >/dev/null && command -v cargo >/dev/null; then
     ux_spin "viddy (cargo — watch replacement; not in Fedora repos)" \
-      cargo install --locked viddy || note_fail "viddy: cargo build failed (log above) — retry later: cargo install --locked viddy"
+      cargo_install --locked viddy || note_fail "viddy: cargo build failed (log above) — retry later: cargo install --locked viddy"
   fi
   # core-doctor's dev/repo + opt-in rows that dnf does not carry on any current release
   # (ast-grep, jj, ouch, jnv, gping, watchexec). The dnf-packaged half of that set
@@ -703,7 +740,7 @@ bootstrap_provision() {
     _crate="${_bin#*:}" _bin="${_bin%%:*}"
     if ! command -v "$_bin" >/dev/null && command -v cargo >/dev/null; then
       ux_spin "$_bin (cargo — not in Fedora repos)" \
-        cargo install --locked "$_crate" || note_fail "$_bin: cargo build failed (log above) — retry later: cargo install --locked $_crate"
+        cargo_install --locked "$_crate" || note_fail "$_bin: cargo build failed (log above) — retry later: cargo install --locked $_crate"
     fi
   done
   unset _bin _crate
@@ -716,7 +753,7 @@ bootstrap_provision() {
   local _ouch_feat="use_zlib,use_zstd_thin"
   if ! command -v ouch >/dev/null && command -v cargo >/dev/null; then
     ux_spin "ouch (cargo, without RAR/bz3 — not in Fedora repos)" \
-      cargo install --locked ouch --no-default-features --features "$_ouch_feat" ||
+      cargo_install --locked ouch --no-default-features --features "$_ouch_feat" ||
       note_fail "ouch: cargo build failed (log above) — retry later: cargo install --locked ouch --no-default-features --features $_ouch_feat"
   fi
 
@@ -748,7 +785,7 @@ bootstrap_provision() {
     if ! _dotfiles_ts_meets_floor "$TREESITTER_FLOOR"; then
       if command -v cargo >/dev/null; then
         ux_spin "tree-sitter-cli (cargo — dnf's build is below the >=$TREESITTER_FLOOR floor, or absent)" \
-          cargo install --locked tree-sitter-cli ||
+          cargo_install --locked tree-sitter-cli ||
           note_fail "tree-sitter-cli: cargo build failed (log above) — retry later: cargo install --locked tree-sitter-cli"
       else
         # Do NOT let this one go quiet. A box below the floor with nvim-treesitter broken
@@ -781,11 +818,11 @@ bootstrap_provision() {
   # that's the binary the crate installs, `tealdeer` is only the package name.
   if ! command -v tldr >/dev/null && command -v cargo >/dev/null; then
     ux_spin "tealdeer (cargo — orphaned; last Fedora build F44)" \
-      cargo install --locked tealdeer || note_fail "tealdeer: cargo build failed (log above) — retry later: cargo install --locked tealdeer"
+      cargo_install --locked tealdeer || note_fail "tealdeer: cargo build failed (log above) — retry later: cargo install --locked tealdeer"
   fi
   if ! command -v procs >/dev/null && command -v cargo >/dev/null; then
     ux_spin "procs (cargo — orphaned; last Fedora build F44)" \
-      cargo install --locked procs || note_fail "procs: cargo build failed (log above) — retry later: cargo install --locked procs"
+      cargo_install --locked procs || note_fail "procs: cargo build failed (log above) — retry later: cargo install --locked procs"
   fi
   blib_say "doggo / sesh / gron (go install where absent)"
   _dotfiles_go_install github.com/mr-karan/doggo/cmd/doggo@latest doggo
@@ -888,10 +925,15 @@ bootstrap_provision() {
     # If 1Password rotates the key this check FAILS CLOSED (no op, loud warning) rather
     # than silently trusting the replacement — which is the entire point.
     local _op_fpr_want="3FEF9748469ADBE15DA7CA80AC2D62742012EA22"
-    local _op_key="" _op_fpr_got=""
-    _op_key="$(mktemp)" || _op_key=""
-    if [[ -n "$_op_key" ]] && curl -fsSL --max-time 30 \
-      https://downloads.1password.com/linux/keys/1password.asc -o "$_op_key" 2>/dev/null; then
+    local _op_key="" _op_fpr_got="" _op_rc=0
+    # A failed mktemp is a local write failure too (a full disk or quota) — rc 23 makes
+    # _dl_why say so, instead of blaming the network for a fetch that never ran.
+    _op_key="$(mktemp)" || { _op_key=""; _op_rc=23; }
+    if [[ -n "$_op_key" ]]; then
+      curl -fsSL --max-time 30 \
+        https://downloads.1password.com/linux/keys/1password.asc -o "$_op_key" 2>/dev/null || _op_rc=$?
+    fi
+    if [[ -n "$_op_key" ]] && ((_op_rc == 0)); then
       # gpg prints the fingerprint without needing a keyring (--with-colons field 10 of the fpr row).
       if command -v gpg >/dev/null 2>&1; then
         _op_fpr_got="$(gpg --show-keys --with-colons "$_op_key" 2>/dev/null |
@@ -901,7 +943,7 @@ bootstrap_provision() {
         _op_fpr_got="SKIP"
       fi
     else
-      note_fail "op: could not download 1Password's signing key (offline?) — skipping the repo"
+      note_fail "op: could not download 1Password's signing key ($(_dl_why "$_op_rc")) — skipping the repo"
       _op_fpr_got="SKIP"
     fi
     if [[ "$_op_fpr_got" != "$_op_fpr_want" ]]; then
@@ -1006,8 +1048,32 @@ bootstrap_wire_pre_loader() {
 # What only this repo knows at the end: on an atomic host the packages are layered, not
 # live, and the cargo/go tools that need the layered toolchain were skipped by their
 # presence guards. The driver prints the tally; this says what to do next.
+# Script scope, so cleanup only ever consumes a dir THIS invocation's mktemp made: a
+# --links-only or --dry-run run never calls _boot_tmp_setup but still reaches
+# bootstrap_closing, and must not act on a _BOOT_TMP inherited from the environment.
+_BOOT_TMP=""
+export -n _BOOT_TMP 2>/dev/null || true
+
+# _boot_tmp_cleanup — drop the on-disk build scratch (see "cargo builds go to DISK") and
+# hand the caller's TMPDIR back. Called from bootstrap_closing AND from provisioning's EXIT
+# trap, so an aborted run (a hard exit, or set -e) does not strand a multi-GB run dir that
+# no later run would ever remove. The path guard keeps this rm from aiming anywhere else.
+_boot_tmp_cleanup() {
+  if [[ "${_BOOT_TMP:-}" == */dotfiles-bootstrap/run.* ]]; then
+    rm -rf -- "$_BOOT_TMP"
+    if [[ -n "${_BOOT_TMPDIR_WAS_SET:-}" ]]; then
+      export TMPDIR="$_BOOT_TMPDIR_ORIG"
+    else
+      unset TMPDIR
+    fi
+    _BOOT_TMP="" # once only: the EXIT trap calls this again after bootstrap_closing
+  fi
+  return 0
+}
+
 # shellcheck disable=SC2329
 bootstrap_closing() {
+  _boot_tmp_cleanup
   if ((ATOMIC_STAGED)); then
     blib_warn "$ATOMIC_STAGED package(s) layered into the next deployment — reboot to apply (${BLIB_SU:+$BLIB_SU }systemctl reboot), then re-run ./bootstrap.sh once so the cargo/go tools build against the layered toolchain"
   fi
