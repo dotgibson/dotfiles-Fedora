@@ -1046,6 +1046,12 @@ bootstrap_wire_pre_loader() {
 # What only this repo knows at the end: on an atomic host the packages are layered, not
 # live, and the cargo/go tools that need the layered toolchain were skipped by their
 # presence guards. The driver prints the tally; this says what to do next.
+# Script scope, so cleanup only ever consumes a dir THIS invocation's mktemp made: a
+# --links-only or --dry-run run never calls _boot_tmp_setup but still reaches
+# bootstrap_closing, and must not act on a _BOOT_TMP inherited from the environment.
+_BOOT_TMP=""
+export -n _BOOT_TMP 2>/dev/null || true
+
 # _boot_tmp_cleanup — drop the on-disk build scratch (see "cargo builds go to DISK") and
 # hand the caller's TMPDIR back. Called from bootstrap_closing AND from provisioning's EXIT
 # trap, so an aborted run (a hard exit, or set -e) does not strand a multi-GB run dir that
