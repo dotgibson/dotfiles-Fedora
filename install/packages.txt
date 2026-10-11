@@ -43,7 +43,8 @@ glow           # markdown viewer
 jc             # command output -> JSON (kellyjonbrazil/jc); F43-F46 ship 1.26.0, pulls python3-jc
 gum            # shell-script UI toolkit (charm)
 du-dust        # dust (du) — Fedora's package name; installs the `dust` binary, same as Debian's
-# xh, sd, doggo, carapace, sesh, gron, op (1Password CLI): NOT reliably in
+# xh, sd, doggo, carapace, sesh, gron, op (1Password CLI), and the dev/opt-in
+# set below that dnf lacks (ast-grep, jj, ouch, jnv, gping, watchexec): NOT reliably in
 # Fedora repos — bootstrap.sh installs them via cargo / go / the 1Password repo.
 # Two were dropped by Fedora rather than never packaged: gron was orphaned (last
 # shipped F41/42) and sd was retired after F41 (rust-sd's `sd` subpackage, last
@@ -57,6 +58,17 @@ du-dust        # dust (du) — Fedora's package name; installs the `dust` binary
 # source build on every currently-supported release) and bootstrap.sh carries
 # presence-guarded cargo fallbacks for them. The dnf install uses --skip-unavailable,
 # so once F45 drops the names the transaction skips them instead of failing.
+
+# ── dev / repo tooling (core-doctor's dev/repo + opt-in rows) ─
+# Core treats most of these as opt-in; this repo installs them anyway. The rest of the
+# set is not in Fedora repos and is cargo-installed by bootstrap.sh.
+difftastic     # structural diff (binary: difft) — git difftool, never the pager
+uv             # Python package/project manager (the binary package; python3-uv is the module)
+ShellCheck     # binary: shellcheck
+shfmt          # shell formatter
+hyperfine      # benchmarking
+lnav           # log navigator
+git-absorb     # auto-fixup commits
 
 # ── editor + git workflow ─────────────────────────────────────
 neovim           # min:0.12.0 — nvim-treesitter (core/nvim, pinned to `main`) will not

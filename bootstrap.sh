@@ -287,7 +287,7 @@ bootstrap_check() {
   else
     blib_warn "install/packages.txt is missing — a real run would abort here"
   fi
-  for _t in starship atuin mise lazygit yazi dust xh sd viddy tldr procs doggo sesh gron carapace op; do
+  for _t in starship atuin mise lazygit yazi dust xh sd viddy tldr procs doggo sesh gron carapace op ast-grep jj ouch jnv gping watchexec; do
     command -v "$_t" >/dev/null 2>&1 || blib_say "would install: $_t"
   done
   unset _t
@@ -637,6 +637,21 @@ bootstrap_provision() {
     ux_spin "viddy (cargo — watch replacement; not in Fedora repos)" \
       cargo install --locked viddy || note_fail "viddy: cargo build failed (log above) — retry later: cargo install --locked viddy"
   fi
+  # core-doctor's dev/repo + opt-in rows that dnf does not carry on any current release
+  # (ast-grep, jj, ouch, jnv, gping, watchexec). The dnf-packaged half of that set
+  # (difftastic, uv, ShellCheck, shfmt, hyperfine, lnav, git-absorb) is in packages.txt.
+  # Same presence-guarded cargo pattern as xh/sd/viddy above. Two crate names differ from
+  # the binary: jj ships as `jj-cli` (the `jujutsu` crate is a redirect stub, see
+  # PORTING-MATRIX.md footnote 8) and watchexec as `watchexec-cli`.
+  local _bin _crate
+  for _bin in ast-grep:ast-grep jj:jj-cli ouch:ouch jnv:jnv gping:gping watchexec:watchexec-cli; do
+    _crate="${_bin#*:}" _bin="${_bin%%:*}"
+    if ! command -v "$_bin" >/dev/null && command -v cargo >/dev/null; then
+      ux_spin "$_bin (cargo — not in Fedora repos)" \
+        cargo install --locked "$_crate" || note_fail "$_bin: cargo build failed (log above) — retry later: cargo install --locked $_crate"
+    fi
+  done
+  unset _bin _crate
 
   # ── nvim-treesitter's two version floors (#192) ────────────────────────────
   # TREESITTER_FLOOR and NEOVIM_FLOOR are declared at the top of this file; the helpers
