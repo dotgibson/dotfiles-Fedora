@@ -287,7 +287,7 @@ bootstrap_check() {
   else
     blib_warn "install/packages.txt is missing — a real run would abort here"
   fi
-  for _t in starship atuin mise lazygit yazi dust xh sd viddy tldr procs doggo sesh gron carapace op; do
+  for _t in starship atuin mise lazygit yazi dust xh sd viddy tldr procs doggo sesh gron carapace op ast-grep jj ouch jnv gping watchexec; do
     command -v "$_t" >/dev/null 2>&1 || blib_say "would install: $_t"
   done
   unset _t
@@ -333,6 +333,16 @@ bootstrap_provision() {
   # It adds only what exists, so it is called AGAIN below once mise.run has run and the
   # cargo builds may have created ~/.cargo/bin. Idempotent by construction.
   blib_user_bindirs_on_path
+
+  # ── cargo builds go to DISK, not /tmp ───────────────────────────────────────
+  # `cargo install` builds in $TMPDIR (default /tmp), and yazi-build nests a second build
+  # there too. Fedora's /tmp is a tmpfs with a per-user quota; on a 4 GB box that quota is
+  # ~1.5 GB, and yazi alone fills ~900 MB of it. Every later cargo block then dies with
+  # EDQUOT, each failure reported only as a note_fail, so the box ends with no
+  # ~/.cargo/bin at all. Exported for the rest of provisioning so every cargo block below
+  # (and anything it spawns) inherits it. cargo removes its own temp dir on success.
+  export TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles-bootstrap/tmp"
+  mkdir -p "$TMPDIR" 2>/dev/null || unset TMPDIR
 
   trap 'blib_sudo_keepalive_stop' EXIT
   blib_sudo_keepalive_start || {
@@ -461,7 +471,45 @@ bootstrap_provision() {
   fi
   if ! command -v atuin >/dev/null; then
     blib_say "atuin (official installer)"
-    run_installer atuin https://setup.atuin.sh
+    # --non-interactive is REQUIRED, not a preference. Without it setup.atuin.sh probes for
+    # a terminal with `{ exec 3</dev/tty; } 2>/dev/null` under `set -eu`, and in POSIX sh a
+    # failed redirection on the special builtin `exec` EXITS the shell, even inside an
+    # `if`. So with no controlling tty (CI, a detached or agent-driven run) the installer
+    # dies with status 1 on its fourth line, having printed nothing. With a tty it instead
+    # asks its import/register/setup prompts, which run_installer's >/dev/null would hide,
+    # leaving an invisible prompt waiting on /dev/tty. Neither belongs in bootstrap.
+    #
+    # The installer also edits shell rc files, and none of it is wanted here: Core runs
+    # `atuin init zsh` itself (00-tools.zsh), and the ~/.local/bin link below puts atuin on
+    # PATH. So: ATUIN_NO_MODIFY_PATH=1 stops the inner release installer's `. ~/.atuin/bin/env`
+    # lines (.profile, .bashrc, .bash_profile, .bash_login, .zshrc, .zshenv), and the outer
+    # script's unconditional `eval "$(atuin init zsh|bash)"` appends are undone by putting
+    # ~/.zshrc and ~/.bashrc back exactly as they were. Restore, not a sed: a line the user
+    # wrote themselves before this run must survive. A file the installer CREATED is removed
+    # only if nothing but its init line is in it.
+    local -a _atuin_rcs=("${ZDOTDIR:-$HOME}/.zshrc" "$HOME/.bashrc")
+    local _atuin_bak _i
+    _atuin_bak="$(mktemp -d)" || _atuin_bak=""
+    if [[ -n "$_atuin_bak" ]]; then
+      for _i in "${!_atuin_rcs[@]}"; do
+        [[ -f "${_atuin_rcs[_i]}" ]] && cp -p -- "${_atuin_rcs[_i]}" "$_atuin_bak/$_i"
+      done
+    fi
+    ATUIN_NO_MODIFY_PATH=1 run_installer atuin https://setup.atuin.sh --non-interactive
+    if [[ -n "$_atuin_bak" ]]; then
+      for _i in "${!_atuin_rcs[@]}"; do
+        if [[ -f "$_atuin_bak/$_i" ]]; then
+          # `cat >` rather than cp/mv: keeps the file's inode, and writes THROUGH a symlink.
+          cmp -s -- "$_atuin_bak/$_i" "${_atuin_rcs[_i]}" ||
+            cat -- "$_atuin_bak/$_i" >"${_atuin_rcs[_i]}" ||
+            note_fail "atuin: could not undo the installer's edit to ${_atuin_rcs[_i]} — remove its 'atuin init' line by hand"
+        elif [[ -f "${_atuin_rcs[_i]}" ]] &&
+          ! grep -qvE '^[[:space:]]*$|^eval "\$\(atuin init (zsh|bash)\)"$' -- "${_atuin_rcs[_i]}"; then
+          rm -f -- "${_atuin_rcs[_i]}"
+        fi
+      done
+      rm -rf -- "$_atuin_bak"
+    fi
   fi
   # atuin's installer hard-codes ~/.atuin/bin (install.sh: ATUIN_BIN="$HOME/.atuin/bin/atuin")
   # and appends its own init line to ~/.zshrc — but wire_links() below REPLACES that file with
@@ -599,10 +647,15 @@ bootstrap_provision() {
       GOBIN="$gobin" ux_spin "$2 (go install)" go install "$1" ||
         note_fail "$2: go install failed — retry later: GOBIN=$gobin go install $1"
     elif command -v mise >/dev/null 2>&1; then
-      # `mise exec go@latest` may first DOWNLOAD an entire Go toolchain, so this is the
-      # slowest arm of the three and the one that most needs a visible elapsed time.
-      GOBIN="$gobin" ux_spin "$2 (go install via mise)" mise exec go@latest -- go install "$1" ||
-        note_fail "$2: go install failed — retry later: GOBIN=$gobin go install $1"
+      # The toolchain is installed EXPLICITLY first; `mise exec go@latest` does not fetch it.
+      # Core's mise/config.toml sets `auto_install = false` (explicit installs only), and
+      # current mise (verified 2026.10.7) inherits that into `exec_auto_install` too, so a
+      # bare `mise exec` on a box with no Go fails in ~2s with "go couldn't exec process".
+      # `mise install` is a no-op once Go is present, so only the first of the three
+      # callers pays for the download.
+      ux_spin "go toolchain (mise install go@latest)" mise install go@latest &&
+        GOBIN="$gobin" ux_spin "$2 (go install via mise)" mise exec go@latest -- go install "$1" ||
+        note_fail "$2: go install failed — retry later: mise install go@latest && GOBIN=$gobin mise exec go@latest -- go install $1"
     else
       note_fail "$2: needs Go — install later with: GOBIN=$gobin go install $1"
     fi
@@ -636,6 +689,33 @@ bootstrap_provision() {
   if ! command -v viddy >/dev/null && command -v cargo >/dev/null; then
     ux_spin "viddy (cargo — watch replacement; not in Fedora repos)" \
       cargo install --locked viddy || note_fail "viddy: cargo build failed (log above) — retry later: cargo install --locked viddy"
+  fi
+  # core-doctor's dev/repo + opt-in rows that dnf does not carry on any current release
+  # (ast-grep, jj, ouch, jnv, gping, watchexec). The dnf-packaged half of that set
+  # (difftastic, uv, ShellCheck, shfmt, hyperfine, lnav, git-absorb) is in packages.txt.
+  # Same presence-guarded cargo pattern as xh/sd/viddy above. Two crate names differ from
+  # the binary: jj ships as `jj-cli` (the `jujutsu` crate is a redirect stub, see
+  # PORTING-MATRIX.md footnote 8) and watchexec as `watchexec-cli`.
+  local _bin _crate
+  for _bin in ast-grep:ast-grep jj:jj-cli jnv:jnv gping:gping watchexec:watchexec-cli; do
+    _crate="${_bin#*:}" _bin="${_bin%%:*}"
+    if ! command -v "$_bin" >/dev/null && command -v cargo >/dev/null; then
+      ux_spin "$_bin (cargo — not in Fedora repos)" \
+        cargo install --locked "$_crate" || note_fail "$_bin: cargo build failed (log above) — retry later: cargo install --locked $_crate"
+    fi
+  done
+  unset _bin _crate
+  # ouch is NOT in the loop above: a default `cargo install ouch` cannot build here at all.
+  # Its default `unrar` feature pulls unrar-ng-sys, whose build.rs unconditionally passes
+  # `-stdlib=libc++`, and this box has GCC + libstdc++ (PORTING-MATRIX.md, the GURU ouch
+  # note). `bzip3` is dropped too: libbzip3-sys runs bindgen, which needs libclang, and
+  # nothing here installs clang. Verified on F44: ouch 0.8.3 builds with exactly this set.
+  # The cost is RAR and .bz3 support; every other format ouch handles is kept.
+  local _ouch_feat="use_zlib,use_zstd_thin"
+  if ! command -v ouch >/dev/null && command -v cargo >/dev/null; then
+    ux_spin "ouch (cargo, without RAR/bz3 — not in Fedora repos)" \
+      cargo install --locked ouch --no-default-features --features "$_ouch_feat" ||
+      note_fail "ouch: cargo build failed (log above) — retry later: cargo install --locked ouch --no-default-features --features $_ouch_feat"
   fi
 
   # ── nvim-treesitter's two version floors (#192) ────────────────────────────
