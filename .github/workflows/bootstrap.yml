@@ -29,7 +29,12 @@ jobs:
     uses: dotgibson/dotfiles-core/.github/workflows/bootstrap-test.yml@v7
     with:
       image: fedora:latest
-      prep: "dnf install -y -q bash zsh"
+      # The second half writes the resolve gate's list: install/packages.txt minus the
+      # names marked `# fallback:` (see that file's header), which F45+ no longer ships
+      # and bootstrap.sh builds instead. Non-fatal and in /tmp, because the weekly
+      # real-bootstrap sweep reuses this prep verbatim and must not care. Apostrophe-free:
+      # Core's reusable evals it inside a single-quoted sh -euc script.
+      prep: 'dnf install -y -q bash zsh && { grep -v "fallback:" install/packages.txt > /tmp/packages-resolve.txt || :; }'
       # Run provision() for real, with package managers and downloaders replaced by
       # logging no-ops (dotgibson/dotfiles-core#575). --links-only returns BEFORE
       # provision() is entered, so package installation, retries, upstream installers,
@@ -50,8 +55,10 @@ jobs:
       # Verified in CI both directions: `bash` and `wget` resolve, a bogus name is REJECTED.
       # -q only silences output the resolver discards; it does not change the status.
       packages_check: dnf -q provides
-      # packages_file is left at its default (install/packages.txt) — this repo's list
-      # needs no pre-filtering, unlike dotfiles-Debian's per-distro annotations.
+      # The filtered list prep writes above. tealdeer, procs and shfmt are orphaned at
+      # F45 (fedora:latest since 2026-10-20) and turned this gate red from 2026-11-04;
+      # they stay in install/packages.txt for F43/F44, marked `# fallback:`.
+      packages_file: /tmp/packages-resolve.txt
 
   # ── the atomic edition (Silverblue / Kinoite / bootc) — the variant's own leg ────────
   # bootstrap.sh grows a second branch on an ostree/bootc host (#186, dotgibson/dotfiles-core

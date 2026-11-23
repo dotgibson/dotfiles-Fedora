@@ -1,5 +1,10 @@
 # dotfiles-Fedora/install/packages.txt
 # dnf package names for the modern terminal stack. One per line; # comments ok.
+# A `# fallback: <how>` comment marks a name some supported release no longer ships:
+# dnf installs it where it exists, bootstrap.sh builds it (<how>) where it does not,
+# and the CI resolve gate skips it, since it is not expected to resolve on fedora:latest.
+# Every other name must resolve on the newest release. Add the marker only with a
+# matching presence-guarded fallback in bootstrap.sh.
 # starship, atuin and yazi are installed by bootstrap.sh instead — keep them OUT
 # of here. Two different reasons, so don't collapse them back into one line:
 #   starship, yazi — genuinely absent from every current Fedora release; the
@@ -28,16 +33,16 @@ zoxide         # cd
 fzf            # fuzzy finder
 git-delta      # git pager / diffs
 btop           # top/htop
-tealdeer       # tldr (fast Rust client; binary: tldr) — ORPHANED, last built F44; no
-               # F45/rawhide(F46) build, so the name stops resolving on 2026-10-20
-               # (F45 GA). Kept here for F43/F44; bootstrap.sh cargo-installs it
-               # wherever dnf no longer resolves the name.
+tealdeer       # fallback: cargo — tldr (fast Rust client; binary: tldr). ORPHANED, last
+               # built F44; no F45/rawhide(F46) build, so the name stopped resolving on
+               # 2026-10-20 (F45 GA). Kept here for F43/F44; bootstrap.sh cargo-installs
+               # it wherever dnf no longer resolves the name.
 
 # ── modern CLI extras (core-doctor probes these; see per-entry notes) ─
 duf            # df   (disk usage/free)
-procs          # ps — ORPHANED, last built F44; no F45/rawhide(F46) build. Same deal as
-               # tealdeer above, same 2026-10-20 date: kept for F43/F44, cargo fallback
-               # covers F45+.
+procs          # fallback: cargo — ps. ORPHANED, last built F44; no F45/rawhide(F46)
+               # build. Same deal as tealdeer above, same 2026-10-20 date: kept for
+               # F43/F44, cargo fallback covers F45+.
 yq             # jq-for-YAML — Fedora's `yq` IS mikefarah's Go build (kislyuk's Python yq is not packaged for Fedora at all)
 glow           # markdown viewer
 jc             # command output -> JSON (kellyjonbrazil/jc); F43-F46 ship 1.26.0, pulls python3-jc
@@ -65,7 +70,9 @@ du-dust        # dust (du) — Fedora's package name; installs the `dust` binary
 difftastic     # structural diff (binary: difft) — git difftool, never the pager
 uv             # Python package/project manager (the binary package; python3-uv is the module)
 ShellCheck     # binary: shellcheck
-shfmt          # shell formatter
+shfmt          # fallback: go — shell formatter. Packaged through F44 only; F45 and
+               # rawhide carry no shfmt (nor golang-mvdan-sh), so bootstrap.sh
+               # go-installs mvdan.cc/sh/v3/cmd/shfmt wherever dnf did not supply it.
 hyperfine      # benchmarking
 lnav           # log navigator
 git-absorb     # auto-fixup commits
