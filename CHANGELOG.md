@@ -13,6 +13,16 @@ project uses [Conventional Commits](https://www.conventionalcommits.org/). Relea
 
 ### Fixed
 
+- **The package-name gate is green on F45 again, and shfmt still lands there.** Since
+  `fedora:latest` became F45 (2026-10-20), `tealdeer`, `procs` and `shfmt` no longer
+  resolve: the first two are orphaned (already documented), and shfmt is packaged through
+  F44 only, with no `golang-mvdan-sh` in F45 or rawhide. The scheduled resolve gate has
+  been red since 2026-11-04. The three stay in `install/packages.txt` for F43/F44, now
+  marked `# fallback: <how>`, and the gate reads a copy without the marked names, so every
+  other name must still resolve on the newest release. shfmt had no fallback, so an F45
+  box silently went without it; `bootstrap.sh` now `go install`s
+  `mvdan.cc/sh/v3/cmd/shfmt` where dnf did not supply it, and the dry-run plan lists it.
+
 - **`dnf repoquery (43)` had been red on every run since the version floors landed (#193),
   and never because of a floor.** The version probe in `test/check-packages.sh` ended its
   options with `--`. dnf5 only treats `--` as end-of-options from 5.4 onwards. The 5.2.x

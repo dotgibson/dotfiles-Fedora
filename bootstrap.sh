@@ -287,7 +287,7 @@ bootstrap_check() {
   else
     blib_warn "install/packages.txt is missing — a real run would abort here"
   fi
-  for _t in starship atuin mise lazygit yazi dust xh sd viddy tldr procs doggo sesh gron carapace op ast-grep jj ouch jnv gping watchexec; do
+  for _t in starship atuin mise lazygit yazi dust xh sd viddy tldr procs doggo sesh gron shfmt carapace op ast-grep jj ouch jnv gping watchexec; do
     command -v "$_t" >/dev/null 2>&1 || blib_say "would install: $_t"
   done
   unset _t
@@ -830,6 +830,10 @@ bootstrap_provision() {
   # gron was orphaned + dropped from Fedora (last in F41/42), so `dnf install gron`
   # fails on current releases — install it from source like the others above.
   _dotfiles_go_install github.com/tomnomnom/gron@latest gron
+  # shfmt is packaged through F44 only (F45/rawhide carry neither shfmt nor
+  # golang-mvdan-sh). On F43/F44 dnf supplies it and _dotfiles_go_install's presence guard
+  # skips the build; on F45+ `--skip-unavailable` drops the name and it is built here.
+  _dotfiles_go_install mvdan.cc/sh/v3/cmd/shfmt@latest shfmt
 
   # carapace: upstream's official RPM, NOT `go install`.
   #
